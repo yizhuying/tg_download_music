@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -15,13 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:embed dist/*
-var distFS embed.FS
-
 // Server holds the HTTP server, configuration, and runtime state.
 type Server struct {
 	router          *gin.Engine
 	config          *config.Manager
+	webFS           fs.FS
 	downloadState   *download.DownloadState
 	downloadManager *download.Manager
 	hub             *Hub
@@ -34,7 +31,7 @@ type Server struct {
 }
 
 // NewServer creates a new Server with all sub-components initialized.
-func NewServer(cfg *config.Manager) *Server {
+func NewServer(cfg *config.Manager, webFS fs.FS) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
@@ -44,6 +41,7 @@ func NewServer(cfg *config.Manager) *Server {
 	s := &Server{
 		router:        r,
 		config:        cfg,
+		webFS:         webFS,
 		downloadState: dlState,
 		logger:        logger,
 	}
@@ -128,7 +126,7 @@ func (s *Server) registerRoutes() {
 }
 
 func (s *Server) spaFallback() gin.HandlerFunc {
-	indexHTML, err := distFS.ReadFile("dist/index.html")
+	indexHTML, err := fs.ReadFile(s.webFS, "index.html")
 	if err != nil {
 		indexHTML = []byte("<h1>Frontend not built. Run: make build</h1>")
 	}
@@ -139,7 +137,6 @@ func (s *Server) spaFallback() gin.HandlerFunc {
 
 // Run starts the HTTP server on the given address.
 func (s *Server) Run(addr string) error {
-	sub, _ := fs.Sub(distFS, "dist")
-	s.router.StaticFS("/assets", http.FS(sub))
+	s.router.StaticFS("/assets", http.FS(s.webFS))
 	return s.router.Run(addr)
 }
