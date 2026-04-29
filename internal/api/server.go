@@ -1,43 +1,130 @@
 package api
 
 import (
+	"context"
 	"embed"
+	"fmt"
 	"io/fs"
 	"net/http"
+	"sync"
 	"telegram-music/internal/config"
+	"telegram-music/internal/download"
+	"telegram-music/internal/telegram"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 //go:embed dist/*
 var distFS embed.FS
 
+// Server holds the HTTP server, configuration, and runtime state.
 type Server struct {
-	router *gin.Engine
-	config *config.Manager
+	router          *gin.Engine
+	config          *config.Manager
+	downloadState   *download.DownloadState
+	downloadManager *download.Manager
+	hub             *Hub
+	authState       AuthState
+	authStateMu     sync.RWMutex
+	tgClient        *telegram.Client
+	runningCtx      context.Context
+	cancelRunning   context.CancelFunc
+	logger          *zap.Logger
 }
 
+// NewServer creates a new Server with all sub-components initialized.
 func NewServer(cfg *config.Manager) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
-	s := &Server{router: r, config: cfg}
+	logger, _ := zap.NewProduction()
+	dlState := download.NewDownloadState()
+
+	s := &Server{
+		router:        r,
+		config:        cfg,
+		downloadState: dlState,
+		logger:        logger,
+	}
+
+	s.hub = NewHub(func() interface{} {
+		return dlState.Get()
+	})
+	go s.hub.Run()
+
 	s.registerRoutes()
 	return s
 }
 
+// ensureTelegramClient lazily initializes the Telegram client and download manager.
+func (s *Server) ensureTelegramClient() error {
+	if s.tgClient != nil {
+		return nil
+	}
+	cfg := s.config.Get()
+	if cfg.APIID == 0 || cfg.APIHash == "" {
+		return fmt.Errorf("telegram API not configured")
+	}
+
+	client, err := telegram.NewClient(context.Background(), telegram.AppConfig{
+		APIID:       cfg.APIID,
+		APIHash:     cfg.APIHash,
+		SessionDir:  cfg.SessionDir,
+		SessionName: cfg.SessionName,
+		Proxy: telegram.ProxyConfig{
+			Scheme:   cfg.Proxy.Scheme,
+			Hostname: cfg.Proxy.Hostname,
+			Port:     cfg.Proxy.Port,
+			Username: cfg.Proxy.Username,
+			Password: cfg.Proxy.Password,
+		},
+	}, s.logger)
+	if err != nil {
+		return err
+	}
+
+	s.tgClient = client
+	s.downloadManager = download.NewManager(client, s.downloadState, s.hub)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.runningCtx = ctx
+	s.cancelRunning = cancel
+	go func() {
+		_ = client.Run(ctx, func(ctx context.Context) error {
+			<-ctx.Done()
+			return nil
+		})
+	}()
+	return nil
+}
+
 func (s *Server) registerRoutes() {
 	s.router.Use(corsMiddleware())
-
-	// SPA fallback — serve index.html for non-API routes
 	s.router.NoRoute(s.spaFallback())
 
-	// API routes
+	s.router.GET("/api/ws", s.hub.HandleWS)
+
 	api := s.router.Group("/api")
 	api.Use(authMiddleware(s.config))
 
 	api.GET("/config", s.getConfig)
 	api.POST("/config", s.saveConfig)
+
+	// Auth routes
+	api.GET("/auth/status", s.getAuthStatus)
+	api.POST("/auth/send_code", s.sendCode)
+	api.POST("/auth/sign_in", s.signIn)
+	api.POST("/auth/logout", s.logout)
+
+	// Download routes
+	api.GET("/download/status", s.getDownloadStatus)
+	api.POST("/download/start", s.startDownload)
+	api.POST("/download/stop", s.stopDownload)
+	api.POST("/download/scan", s.scanChannels)
+	api.GET("/download/list", s.getDownloadList)
+	api.POST("/download/single", s.downloadSingle)
+	api.POST("/download/quick_test", s.quickTest)
 }
 
 func (s *Server) spaFallback() gin.HandlerFunc {
@@ -50,10 +137,9 @@ func (s *Server) spaFallback() gin.HandlerFunc {
 	}
 }
 
+// Run starts the HTTP server on the given address.
 func (s *Server) Run(addr string) error {
-	// Serve static assets from embedded dist
 	sub, _ := fs.Sub(distFS, "dist")
 	s.router.StaticFS("/assets", http.FS(sub))
-
 	return s.router.Run(addr)
 }
