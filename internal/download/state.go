@@ -1,0 +1,120 @@
+package download
+
+import (
+	"sync"
+	"time"
+)
+
+// LogEntry represents a single log line in the download state.
+type LogEntry struct {
+	Time    string `json:"time"`
+	Message string `json:"message"`
+}
+
+// State represents the current download manager state exposed via API.
+type State struct {
+	Running         bool       `json:"running"`
+	TotalDownloaded int        `json:"total_downloaded"`
+	CurrentChannel  string     `json:"current_channel"`
+	StartedAt       string     `json:"started_at"`
+	Logs            []LogEntry `json:"logs"`
+}
+
+// ScannedMessage represents an audio message found during channel scanning.
+type ScannedMessage struct {
+	Channel      string `json:"channel"`
+	ChannelTitle string `json:"channel_title"`
+	MsgID        int    `json:"msg_id"`
+	FileName     string `json:"file_name"`
+	FileSize     int64  `json:"file_size"`
+	Exists       bool   `json:"exists"`
+}
+
+// DownloadState holds thread-safe download state and scanned messages.
+type DownloadState struct {
+	mu       sync.RWMutex
+	state    State
+	messages []ScannedMessage
+	scannedAt string
+}
+
+// NewDownloadState creates a new DownloadState with initialized logs slice.
+func NewDownloadState() *DownloadState {
+	return &DownloadState{
+		state: State{Logs: make([]LogEntry, 0, 100)},
+	}
+}
+
+// Get returns a snapshot copy of the current state.
+func (ds *DownloadState) Get() State {
+	ds.mu.RLock()
+	defer ds.mu.RUnlock()
+	s := ds.state
+	s.Logs = make([]LogEntry, len(ds.state.Logs))
+	copy(s.Logs, ds.state.Logs)
+	return s
+}
+
+// SetRunning updates the running flag and optionally the current channel.
+func (ds *DownloadState) SetRunning(running bool, channel string) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	ds.state.Running = running
+	ds.state.CurrentChannel = channel
+	if running {
+		ds.state.StartedAt = time.Now().Format("2006-01-02 15:04:05")
+		ds.state.TotalDownloaded = 0
+		ds.state.Logs = make([]LogEntry, 0, 100)
+	}
+}
+
+// IncrementDownloaded atomically increases the total download counter.
+func (ds *DownloadState) IncrementDownloaded() {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	ds.state.TotalDownloaded++
+}
+
+// AddLog appends a timestamped log entry and returns it.
+func (ds *DownloadState) AddLog(msg string) LogEntry {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	entry := LogEntry{
+		Time:    time.Now().Format("15:04:05"),
+		Message: msg,
+	}
+	ds.state.Logs = append(ds.state.Logs, entry)
+	if len(ds.state.Logs) > 500 {
+		ds.state.Logs = ds.state.Logs[len(ds.state.Logs)-500:]
+	}
+	return entry
+}
+
+// SetMessages replaces the scanned messages list.
+func (ds *DownloadState) SetMessages(msgs []ScannedMessage) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	ds.messages = msgs
+	ds.scannedAt = time.Now().Format("2006-01-02 15:04:05")
+}
+
+// GetMessages returns a copy of the scanned messages and the scan timestamp.
+func (ds *DownloadState) GetMessages() ([]ScannedMessage, string) {
+	ds.mu.RLock()
+	defer ds.mu.RUnlock()
+	msgs := make([]ScannedMessage, len(ds.messages))
+	copy(msgs, ds.messages)
+	return msgs, ds.scannedAt
+}
+
+// MarkDownloaded sets Exists=true for a specific channel+message combination.
+func (ds *DownloadState) MarkDownloaded(channel string, msgID int) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	for i := range ds.messages {
+		if ds.messages[i].Channel == channel && ds.messages[i].MsgID == msgID {
+			ds.messages[i].Exists = true
+			break
+		}
+	}
+}

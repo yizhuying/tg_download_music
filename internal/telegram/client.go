@@ -8,6 +8,7 @@ import (
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
+	"github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/tg"
 	"go.uber.org/zap"
 )
@@ -109,4 +110,11 @@ func (c *Client) IsAuthorized(ctx context.Context) (bool, error) {
 // Note: gotd handles cleanup on context cancellation; this is a no-op placeholder.
 func (c *Client) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+// DownloadToFile downloads a file from Telegram to a local path using gotd's downloader.
+func (c *Client) DownloadToFile(ctx context.Context, location tg.InputFileLocationClass, path string) error {
+	dl := downloader.NewDownloader().WithAllowCDN(true)
+	_, err := dl.Download(c.client.API(), location).WithThreads(4).ToPath(ctx, path)
+	return err
 }
