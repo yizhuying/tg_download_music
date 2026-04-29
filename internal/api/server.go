@@ -137,6 +137,9 @@ func (s *Server) spaFallback() gin.HandlerFunc {
 
 // Run starts the HTTP server on the given address.
 func (s *Server) Run(addr string) error {
-	s.router.StaticFS("/assets", http.FS(s.webFS))
+	assetsFS, err := fs.Sub(s.webFS, "assets")
+	if err == nil {
+		s.router.StaticFS("/assets", http.FS(assetsFS))
+	}
 	return s.router.Run(addr)
 }
