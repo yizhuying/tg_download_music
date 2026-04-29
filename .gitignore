@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Sessions and downloads
+sessions/
+downloads/
+config.json
+
+# IDE
+.idea/
+.vscode/
+
+# Env
+.env
+
+# Frontend
+web/node_modules/
+web/dist/
