@@ -655,6 +655,7 @@ package download
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1097,7 +1098,6 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 	}
 	defer file.Close()
 
-	// Download with streaming
 	_, err = m.client.Raw().Download(ctx, location, func(ctx context.Context, r io.Reader) error {
 		_, err := io.Copy(file, r)
 		return err
@@ -1260,23 +1260,20 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
-	"telegram-music/internal/telegram"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 type AuthState struct {
 	PhoneCodeHash string
 	PhoneNumber   string
-	Client        *telegram.Client
 }
 
 func (s *Server) getAuthStatus(c *gin.Context) {
 	cfg := s.config.Get()
-	sessionPath := filepath.Join(cfg.SessionDir, cfg.SessionName+".session")
-	exists := fileExists(sessionPath)
+	sessionPath := filepath.Join(cfg.SessionDir, cfg.SessionName+".json")
+	_, err := os.Stat(sessionPath)
+	exists := err == nil
 
 	c.JSON(http.StatusOK, gin.H{
 		"authorized":   exists,
@@ -1299,41 +1296,13 @@ func (s *Server) sendCode(c *gin.Context) {
 	cfg.PhoneNumber = req.PhoneNumber
 	_ = s.config.Save(cfg)
 
-	// Clear old client
-	s.authStateMu.Lock()
-	if s.authState.Client != nil {
-		s.authState.Client = nil
-	}
-	s.authStateMu.Unlock()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	logger, _ := zap.NewProduction()
-	client, err := telegram.NewClient(ctx, telegram.AppConfig{
-		APIID:       cfg.APIID,
-		APIHash:     cfg.APIHash,
-		SessionDir:  cfg.SessionDir,
-		SessionName: cfg.SessionName,
-		Proxy: telegram.ProxyConfig{
-			Scheme:   cfg.Proxy.Scheme,
-			Hostname: cfg.Proxy.Hostname,
-			Port:     cfg.Proxy.Port,
-			Username: cfg.Proxy.Username,
-			Password: cfg.Proxy.Password,
-		},
-	}, logger)
-	if err != nil {
+	// Start persistent TG client if not running
+	if err := s.ensureTelegramClient(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	var result *telegram.SendCodeResult
-	err = client.Run(ctx, func(ctx context.Context) error {
-		r, e := client.SendCode(ctx, req.PhoneNumber)
-		result = r
-		return e
-	})
+	result, err := s.tgClient.SendCode(context.Background(), req.PhoneNumber)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -1343,7 +1312,6 @@ func (s *Server) sendCode(c *gin.Context) {
 	s.authState = AuthState{
 		PhoneCodeHash: result.PhoneCodeHash,
 		PhoneNumber:   req.PhoneNumber,
-		Client:        client,
 	}
 	s.authStateMu.Unlock()
 
@@ -1368,20 +1336,17 @@ func (s *Server) signIn(c *gin.Context) {
 	state := s.authState
 	s.authStateMu.Unlock()
 
-	if state.Client == nil || state.PhoneCodeHash == "" {
+	if state.PhoneCodeHash == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请先发送验证码"})
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	if err := s.ensureTelegramClient(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
-	var result *telegram.SignInResult
-	err := state.Client.Run(ctx, func(ctx context.Context) error {
-		r, e := state.Client.SignIn(ctx, state.PhoneNumber, req.PhoneCode, state.PhoneCodeHash, req.Password)
-		result = r
-		return e
-	})
+	result, err := s.tgClient.SignIn(context.Background(), state.PhoneNumber, req.PhoneCode, state.PhoneCodeHash, req.Password)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -1405,11 +1370,16 @@ func (s *Server) signIn(c *gin.Context) {
 
 func (s *Server) logout(c *gin.Context) {
 	s.authStateMu.Lock()
-	if s.authState.Client != nil {
-		_ = s.authState.Client.Disconnect(context.Background())
-		s.authState.Client = nil
-	}
+	s.authState = AuthState{}
 	s.authStateMu.Unlock()
+
+	// Cancel persistent background connection
+	if s.cancelRunning != nil {
+		s.cancelRunning()
+		s.cancelRunning = nil
+	}
+	s.tgClient = nil
+	s.downloadManager = nil
 
 	cfg := s.config.Get()
 	sessionPath := filepath.Join(cfg.SessionDir, cfg.SessionName+".json")
@@ -1523,7 +1493,9 @@ Replace `internal/api/server.go` with:
 package api
 
 import (
+	"context"
 	"embed"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"sync"
@@ -1539,15 +1511,17 @@ import (
 var distFS embed.FS
 
 type Server struct {
-	router        *gin.Engine
-	config        *config.Manager
-	downloadState *download.DownloadState
+	router          *gin.Engine
+	config          *config.Manager
+	downloadState   *download.DownloadState
 	downloadManager *download.Manager
-	hub           *Hub
-	authState     AuthState
-	authStateMu   sync.RWMutex
-	tgClient      *telegram.Client
-	logger        *zap.Logger
+	hub             *Hub
+	authState       AuthState
+	authStateMu     sync.RWMutex
+	tgClient        *telegram.Client
+	runningCtx      context.Context
+	cancelRunning   context.CancelFunc
+	logger          *zap.Logger
 }
 
 func NewServer(cfg *config.Manager) *Server {
@@ -1570,14 +1544,52 @@ func NewServer(cfg *config.Manager) *Server {
 	})
 	go s.hub.Run()
 
-	// Wire up download manager broadcaster
-	type broadcasterAdapter struct {
-		hub *Hub
-	}
-	// Download manager will be created later when TG client is ready
-
 	s.registerRoutes()
 	return s
+}
+
+// ensureTelegramClient creates the Telegram client (persistent) and download manager.
+// Called lazily on first auth/download use.
+func (s *Server) ensureTelegramClient() error {
+	if s.tgClient != nil {
+		return nil
+	}
+	cfg := s.config.Get()
+	if cfg.APIID == 0 || cfg.APIHash == "" {
+		return fmt.Errorf("telegram API not configured")
+	}
+
+	client, err := telegram.NewClient(context.Background(), telegram.AppConfig{
+		APIID:       cfg.APIID,
+		APIHash:     cfg.APIHash,
+		SessionDir:  cfg.SessionDir,
+		SessionName: cfg.SessionName,
+		Proxy: telegram.ProxyConfig{
+			Scheme:   cfg.Proxy.Scheme,
+			Hostname: cfg.Proxy.Hostname,
+			Port:     cfg.Proxy.Port,
+			Username: cfg.Proxy.Username,
+			Password: cfg.Proxy.Password,
+		},
+	}, s.logger)
+	if err != nil {
+		return err
+	}
+
+	s.tgClient = client
+	s.downloadManager = download.NewManager(client, s.downloadState, s.hub)
+
+	// Start persistent background connection using Run() with a blocking function
+	ctx, cancel := context.WithCancel(context.Background())
+	s.runningCtx = ctx
+	s.cancelRunning = cancel
+	go func() {
+		_ = client.Run(ctx, func(ctx context.Context) error {
+			<-ctx.Done()
+			return nil
+		})
+	}()
+	return nil
 }
 
 func (s *Server) registerRoutes() {
