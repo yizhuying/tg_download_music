@@ -3,6 +3,7 @@ package download
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,7 +17,7 @@ import (
 type TelegramAPI interface {
 	Run(ctx context.Context, f func(ctx context.Context) error) error
 	API() *tg.Client
-	DownloadToFile(ctx context.Context, location tg.InputFileLocationClass, path string) error
+	DownloadToFile(ctx context.Context, location tg.InputFileLocationClass, path string, w io.WriterAt) error
 }
 
 // Broadcaster interface for WebSocket messages.
@@ -41,6 +42,17 @@ func NewManager(client TelegramAPI, state *DownloadState, hub Broadcaster) *Mana
 func sanitizeFilename(name string) string {
 	re := regexp.MustCompile(`[\\/*?:"<>|]`)
 	return re.ReplaceAllString(name, "_")
+}
+
+func humanReadableSize(size int64) string {
+	units := []string{"B", "KB", "MB", "GB", "TB"}
+	s := float64(size)
+	i := 0
+	for s >= 1024 && i < len(units)-1 {
+		s /= 1024
+		i++
+	}
+	return fmt.Sprintf("%.1f%s", s, units[i])
 }
 
 func fileExists(path string) bool {
@@ -494,5 +506,48 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 		FileReference: doc.FileReference,
 	}
 
-	return m.client.DownloadToFile(ctx, location, savePath)
+	var mu sync.Mutex
+	var lastReported int64
+	file, err := os.Create(savePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	progressWriter := &progressWriterAt{
+		w: file,
+		total: doc.Size,
+		report: func(current, total int64) {
+			mu.Lock()
+			defer mu.Unlock()
+			if current-lastReported >= doc.Size/10 || current == total {
+				lastReported = current
+				pct := float64(current) / float64(total) * 100
+				downloaded := humanReadableSize(current) + "/" + humanReadableSize(total)
+				m.hub.Broadcast("log", map[string]string{
+					"time":    "now",
+					"message": fmt.Sprintf("📥 %s (%.0f%%)", downloaded, pct),
+				})
+			}
+		},
+	}
+
+	return m.client.DownloadToFile(ctx, location, "", progressWriter)
+}
+
+// progressWriterAt wraps an io.WriterAt and reports progress.
+type progressWriterAt struct {
+	w      io.WriterAt
+	total  int64
+	written int64
+	report func(current, total int64)
+}
+
+func (w *progressWriterAt) WriteAt(p []byte, off int64) (int, error) {
+	n, err := w.w.WriteAt(p, off)
+	w.written += int64(n)
+	if w.report != nil {
+		w.report(w.written, w.total)
+	}
+	return n, err
 }

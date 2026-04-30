@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -112,9 +113,10 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-// DownloadToFile downloads a file from Telegram to a local path using gotd's downloader.
-func (c *Client) DownloadToFile(ctx context.Context, location tg.InputFileLocationClass, path string) error {
+// DownloadToFile downloads a file from Telegram using gotd's downloader,
+// writing to the provided io.WriterAt. Progress is reported via the callback.
+func (c *Client) DownloadToFile(ctx context.Context, location tg.InputFileLocationClass, _ string, w io.WriterAt) error {
 	dl := downloader.NewDownloader().WithAllowCDN(true)
-	_, err := dl.Download(c.client.API(), location).WithThreads(4).ToPath(ctx, path)
+	_, err := dl.Download(c.client.API(), location).WithThreads(4).Parallel(ctx, w)
 	return err
 }
