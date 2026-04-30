@@ -13,6 +13,10 @@ func (s *Server) getDownloadStatus(c *gin.Context) {
 }
 
 func (s *Server) startDownload(c *gin.Context) {
+	if err := s.ensureTelegramClient(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	cfg := s.config.Get()
 	if len(cfg.Channels) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "没有配置频道"})
@@ -27,6 +31,10 @@ func (s *Server) startDownload(c *gin.Context) {
 }
 
 func (s *Server) stopDownload(c *gin.Context) {
+	if err := s.ensureTelegramClient(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	if err := s.downloadManager.Stop(); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -36,6 +44,10 @@ func (s *Server) stopDownload(c *gin.Context) {
 }
 
 func (s *Server) scanChannels(c *gin.Context) {
+	if err := s.ensureTelegramClient(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	cfg := s.config.Get()
 	if err := s.downloadManager.ScanChannels(context.Background(), cfg.Channels, cfg.DownloadDir); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -55,6 +67,10 @@ func (s *Server) getDownloadList(c *gin.Context) {
 }
 
 func (s *Server) downloadSingle(c *gin.Context) {
+	if err := s.ensureTelegramClient(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	var req struct {
 		Channel string `json:"channel" binding:"required"`
 		MsgID   int    `json:"msg_id" binding:"required"`
@@ -73,6 +89,10 @@ func (s *Server) downloadSingle(c *gin.Context) {
 }
 
 func (s *Server) quickTest(c *gin.Context) {
+	if err := s.ensureTelegramClient(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	cfg := s.config.Get()
 	if len(cfg.Channels) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "没有配置频道"})
