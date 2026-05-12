@@ -6,8 +6,17 @@ APP_PORT="${wizard_app_port}"
 
 echo "应用端口: $APP_PORT"
 
+# Construct paths relative to package root
+PKG_ROOT="$(dirname "$0")/.."
+SERVER_BIN="${PKG_ROOT}/app/server/telegram-music-server"
+CONFIG_FILE="${PKG_ROOT}/config.json"
+SESSION_DIR="${PKG_ROOT}/sessions"
+
+# Ensure session directory exists
+mkdir -p "${SESSION_DIR}"
+
 # write the command to start your program here
-CMD="./telegram-music-server -port ${APP_PORT}"
+CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE}"
 
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
