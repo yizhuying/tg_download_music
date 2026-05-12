@@ -17,17 +17,12 @@ import (
 var distFS embed.FS
 
 func main() {
-	addr := flag.String("addr", "", "server listen address (e.g. :9090)")
 	port := flag.Int("port", 8080, "server listen port")
 	configPath := flag.String("config", "config.json", "config file path")
 	downloadDir := flag.String("download-dir", "", "override download directory")
 	flag.Parse()
 
-	listenAddr := *addr
-	if listenAddr == "" {
-		listenAddr = fmt.Sprintf(":%d", *port)
-	}
-
+	listenAddr := fmt.Sprintf(":%d", *port)
 	cfg, err := config.NewManager(*configPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
