@@ -32,7 +32,7 @@ echo "APP_PORT='${APP_PORT}'" >> "${LOG_FILE}" 2>/dev/null || true
 echo "应用端口: $APP_PORT"
 
 # Construct paths relative to actual install directory
-SERVER_BIN="${APP_ROOT}/app/server/telegram-music-server"
+SERVER_BIN="${APP_ROOT}/server/telegram-music-server"
 CONFIG_FILE="${APP_ROOT}/config.json"
 SESSION_DIR="${APP_ROOT}/sessions"
 
