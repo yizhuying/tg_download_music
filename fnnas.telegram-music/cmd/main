@@ -1,16 +1,40 @@
 #!/bin/bash
 
-LOG_FILE="${TRIM_PKGVAR}/info.log"
-PID_FILE="${TRIM_PKGVAR}/app.pid"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PKG_ROOT="$(dirname "${SCRIPT_DIR}")"
+
+# fnOS runtime dir is /var/apps/<name>, symlink target points to actual install dir
+if [ -L "${PKG_ROOT}/target" ]; then
+    APP_ROOT="$(readlink -f "${PKG_ROOT}/target")"
+else
+    APP_ROOT="${PKG_ROOT}"
+fi
+
+# Fallback log/pid paths if TRIM_PKGVAR is empty
+if [ -n "${TRIM_PKGVAR:-}" ]; then
+    LOG_FILE="${TRIM_PKGVAR}/info.log"
+    PID_FILE="${TRIM_PKGVAR}/app.pid"
+else
+    LOG_FILE="${APP_ROOT}/var/info.log"
+    PID_FILE="${APP_ROOT}/var/app.pid"
+    mkdir -p "${APP_ROOT}/var"
+fi
 APP_PORT="${wizard_app_port}"
+if [ -z "${APP_PORT}" ]; then
+    APP_PORT="8080"
+fi
+
+# Debug
+echo "TRIM_PKGVAR='${TRIM_PKGVAR:-}'" >> "${LOG_FILE}" 2>/dev/null || true
+echo "APP_ROOT='${APP_ROOT}'" >> "${LOG_FILE}" 2>/dev/null || true
+echo "APP_PORT='${APP_PORT}'" >> "${LOG_FILE}" 2>/dev/null || true
 
 echo "应用端口: $APP_PORT"
 
-# Construct paths relative to package root
-PKG_ROOT="$(dirname "$0")/.."
-SERVER_BIN="${PKG_ROOT}/app/server/telegram-music-server"
-CONFIG_FILE="${PKG_ROOT}/config.json"
-SESSION_DIR="${PKG_ROOT}/sessions"
+# Construct paths relative to actual install directory
+SERVER_BIN="${APP_ROOT}/app/server/telegram-music-server"
+CONFIG_FILE="${APP_ROOT}/config.json"
+SESSION_DIR="${APP_ROOT}/sessions"
 
 # Ensure session directory exists
 mkdir -p "${SESSION_DIR}"
