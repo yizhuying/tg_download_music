@@ -25,3 +25,6 @@ config.json
 # Frontend
 web/node_modules/
 web/dist/
+
+# fnOS packages
+*.fpk
