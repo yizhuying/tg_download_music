@@ -3,7 +3,7 @@
 build: build-frontend build-server
 
 build-server:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local /opt/development/language/go/1.25.10/bin/go build -o telegram-music ./cmd/server/
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local go build -o telegram-music-server ./cmd/server/
 
 build-frontend:
 	cd web && npm install && npx vite build
