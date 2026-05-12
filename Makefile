@@ -1,4 +1,4 @@
-.PHONY: build build-frontend build-server dev clean
+.PHONY: build build-frontend build-server dev clean fnos
 
 build: build-frontend build-server
 
@@ -14,4 +14,8 @@ dev:
 
 clean:
 	rm -f telegram-music
+	rm -f telegram-music-server
 	rm -rf cmd/server/dist
+
+fnos:
+	bash scripts/build-fnos.sh
