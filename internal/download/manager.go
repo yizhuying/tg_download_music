@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gotd/td/tg"
 )
@@ -18,6 +19,7 @@ type TelegramAPI interface {
 	Run(ctx context.Context, f func(ctx context.Context) error) error
 	API() *tg.Client
 	DownloadToFile(ctx context.Context, location tg.InputFileLocationClass, path string, w io.WriterAt) error
+	WaitReady(ctx context.Context) error
 }
 
 // Broadcaster interface for WebSocket messages.
@@ -170,6 +172,11 @@ func (m *Manager) Start(ctx context.Context, channels []string, downloadDir stri
 			m.state.SetRunning(false, "")
 		}()
 
+		if err := m.client.WaitReady(ctx); err != nil {
+			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
+			return
+		}
+
 		for _, ch := range channels {
 			select {
 			case <-ctx.Done():
@@ -209,6 +216,11 @@ func (m *Manager) Stop() error {
 // ScanChannels starts background scanning of channels for audio messages.
 func (m *Manager) ScanChannels(ctx context.Context, channels []string, downloadDir string) error {
 	go func() {
+		ctx := context.Background()
+		if err := m.client.WaitReady(ctx); err != nil {
+			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
+			return
+		}
 		for _, ch := range channels {
 			m.state.AddLog(fmt.Sprintf("扫描频道: %s", ch))
 			msgs, err := m.scanChannel(ctx, ch, downloadDir)
@@ -254,6 +266,11 @@ func (m *Manager) DownloadSingle(ctx context.Context, channel, dir string, msgID
 			m.state.SetRunning(false, "")
 		}()
 
+		if err := m.client.WaitReady(ctx); err != nil {
+			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
+			return
+		}
+
 		success, err := m.downloadMessage(ctx, channel, dir, msgID)
 		if err != nil || !success {
 			m.state.AddLog("下载失败")
@@ -291,11 +308,21 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 			m.state.SetRunning(false, "")
 		}()
 
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		if err := m.client.WaitReady(ctx); err != nil {
+			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
+			return
+		}
+
 		_, peer, err := m.resolveChannel(ctx, channel)
 		if err != nil {
 			m.state.AddLog(fmt.Sprintf("频道不存在: %v", err))
 			return
 		}
+
+		m.state.AddLog(fmt.Sprintf("正在获取消息历史 (Peer: %T)...", peer))
 
 		messages, err := m.client.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
 			Peer:  peer,
@@ -306,20 +333,32 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 			return
 		}
 
-		mm, ok := messages.(*tg.MessagesMessages)
-		if !ok {
+		m.state.AddLog(fmt.Sprintf("获取到消息类型: %T", messages))
+
+		var messagesList []tg.MessageClass
+		switch v := messages.(type) {
+		case *tg.MessagesMessages:
+			messagesList = v.Messages
+		case *tg.MessagesMessagesSlice:
+			messagesList = v.Messages
+		case *tg.MessagesChannelMessages:
+			messagesList = v.Messages
+		default:
+			m.state.AddLog(fmt.Sprintf("未知消息类型: %T", messages))
 			return
 		}
 
-		for _, msg := range mm.Messages {
+		for _, msg := range messagesList {
 			msgMsg, doc, ok := extractAudio(msg)
 			if !ok || !isAudio(doc) {
 				continue
 			}
 
 			m.state.AddLog(fmt.Sprintf("找到音频，消息ID: %d", msgMsg.ID))
-			success, _ := m.downloadMessage(ctx, channel, dir, msgMsg.ID)
-			if success {
+			success, err := m.downloadMessage(ctx, channel, dir, msgMsg.ID)
+			if err != nil {
+				m.state.AddLog(fmt.Sprintf("下载错误: %v", err))
+			} else if success {
 				m.state.MarkDownloaded(channel, msgMsg.ID)
 				m.state.IncrementDownloaded()
 				m.state.AddLog("快速测试完成")
@@ -515,7 +554,7 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 	defer file.Close()
 
 	progressWriter := &progressWriterAt{
-		w: file,
+		w:     file,
 		total: doc.Size,
 		report: func(current, total int64) {
 			mu.Lock()
@@ -537,10 +576,10 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 
 // progressWriterAt wraps an io.WriterAt and reports progress.
 type progressWriterAt struct {
-	w      io.WriterAt
-	total  int64
+	w       io.WriterAt
+	total   int64
 	written int64
-	report func(current, total int64)
+	report  func(current, total int64)
 }
 
 func (w *progressWriterAt) WriteAt(p []byte, off int64) (int, error) {

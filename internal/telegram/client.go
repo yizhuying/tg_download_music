@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -105,6 +106,24 @@ func (c *Client) IsAuthorized(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	return self != nil, nil
+}
+
+// WaitReady blocks until the client is connected or the context expires.
+// It is safe to call this before any API operation to ensure the session
+// is established.
+func (c *Client) WaitReady(ctx context.Context) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if _, err := c.client.Self(ctx); err == nil {
+				return nil
+			}
+		}
+	}
 }
 
 // Disconnect gracefully disconnects the client.

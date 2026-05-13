@@ -38,9 +38,9 @@ func Defaults() Config {
 }
 
 type Manager struct {
-	mu     sync.RWMutex
-	cfg    Config
-	path   string
+	mu      sync.RWMutex
+	cfg     Config
+	path    string
 	modTime time.Time
 }
 
@@ -63,7 +63,30 @@ func (m *Manager) Get() Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	c := m.cfg
+	if !isWritable(c.DownloadDir) {
+		if paths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"); paths != "" {
+			for _, p := range filepath.SplitList(paths) {
+				if isWritable(p) {
+					c.DownloadDir = p
+					break
+				}
+			}
+		}
+	}
 	return c
+}
+
+func isWritable(path string) bool {
+	if path == "" {
+		return false
+	}
+	f, err := os.CreateTemp(path, ".writetest_*")
+	if err != nil {
+		return false
+	}
+	f.Close()
+	os.Remove(f.Name())
+	return true
 }
 
 func (m *Manager) Save(c Config) error {
