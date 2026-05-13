@@ -15,7 +15,7 @@ const loginError = ref('')
 const apiId = ref(0)
 const apiHash = ref('')
 const sessionName = ref('my_session')
-const proxyScheme = ref('socks5')
+const proxyScheme = ref('none')
 const proxyHostname = ref('')
 const proxyPort = ref(0)
 const proxyUsername = ref('')
@@ -72,7 +72,7 @@ function showToast(msg: string) {
 
 async function doLogin() {
   if (!password.value) {
-    loginError.value = '请输入密码';
+    loginError.value = '请输入密码'
     return
   }
   setAdminPassword(password.value)
@@ -92,7 +92,7 @@ function fillConfig(data: any) {
   apiHash.value = data.api_hash || ''
   sessionName.value = data.session_name || 'my_session'
   const p = data.proxy || {}
-  proxyScheme.value = p.scheme || 'socks5'
+  proxyScheme.value = p.scheme || 'none'
   proxyHostname.value = p.hostname || ''
   proxyPort.value = p.port || 0
   proxyUsername.value = p.username || ''
@@ -113,7 +113,11 @@ async function loadAuthStatus() {
 }
 
 async function doSendCode() {
-  if (!authPhone.value) return
+  if (!authPhone.value) {
+    showToast('请输入手机号')
+    return
+  }
+  await doSaveConfig()
   try {
     await sendCode(authPhone.value)
     showCodeSection.value = true
@@ -163,6 +167,14 @@ async function doLogout() {
 }
 
 async function doSaveConfig() {
+  if (!apiId.value || !apiHash.value) {
+    showToast('API ID 和 API Hash 为必填项')
+    return
+  }
+  if (proxyScheme.value !== 'none' && (!proxyHostname.value || !proxyPort.value)) {
+    showToast('代理主机和端口为必填项')
+    return
+  }
   const data = {
     api_id: apiId.value,
     api_hash: apiHash.value,
@@ -230,6 +242,81 @@ onMounted(() => {
 
     <div v-if="!showLogin">
       <div class="card">
+        <h2>API 凭证</h2>
+        <div class="form-group">
+          <label>API ID <span class="required">*</span></label>
+          <input type="number" v-model.number="apiId"/>
+        </div>
+        <div class="form-group">
+          <label>API Hash <span class="required">*</span></label>
+          <input type="password" v-model="apiHash"/>
+        </div>
+        <div class="form-group">
+          <label>Session 名称</label>
+          <input type="text" v-model="sessionName"/>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>代理配置</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label>代理类型</label>
+            <select v-model="proxyScheme">
+              <option value="none">无</option>
+              <option value="socks5">SOCKS5</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>主机地址 <span v-if="proxyScheme !== 'none'" class="required">*</span></label>
+            <input type="text" v-model="proxyHostname" placeholder="127.0.0.1"
+                   :disabled="proxyScheme === 'none'"/>
+          </div>
+          <div class="form-group">
+            <label>端口 <span v-if="proxyScheme !== 'none'" class="required">*</span></label>
+            <input type="number" v-model.number="proxyPort" placeholder="1080"
+                   :disabled="proxyScheme === 'none'"/>
+          </div>
+        </div>
+        <div class="form-row" v-if="proxyScheme !== 'none'">
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" v-model="proxyUsername" placeholder="可选"/>
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" v-model="proxyPassword" placeholder="可选"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>频道列表</h2>
+        <div v-for="(ch, i) in channels" :key="i" class="channel-row">
+          <input class="channel-input" v-model="channels[i]" placeholder="频道用户名"/>
+          <button class="btn btn-danger btn-sm" @click="removeChannel(i)">删除</button>
+        </div>
+        <button class="btn btn-secondary" @click="addChannel">+ 添加频道</button>
+      </div>
+
+      <div class="card">
+        <h2>存储路径</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Session 目录</label>
+            <input type="text" v-model="sessionDir"/>
+          </div>
+          <div class="form-group">
+            <label>下载目录</label>
+            <div class="dir-input-group">
+              <input type="text" v-model="downloadDir"/>
+              <button class="btn btn-secondary btn-sm" @click="openDirPicker">选择目录</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>Telegram 认证</h2>
         <div v-if="authLoading">检查中...</div>
         <div v-else-if="!authLoggedIn">
@@ -274,80 +361,6 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="card">
-        <h2>API 凭证</h2>
-        <div class="form-group">
-          <label>API ID</label>
-          <input type="number" v-model.number="apiId"/>
-        </div>
-        <div class="form-group">
-          <label>API Hash</label>
-          <input type="password" v-model="apiHash"/>
-        </div>
-        <div class="form-group">
-          <label>Session 名称</label>
-          <input type="text" v-model="sessionName"/>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>代理配置</h2>
-        <div class="form-row">
-          <div class="form-group">
-            <label>代理类型</label>
-            <select v-model="proxyScheme">
-              <option value="socks5">SOCKS5</option>
-              <!--              <option value="socks4">SOCKS4</option>-->
-              <!--              <option value="http">HTTP</option>-->
-            </select>
-          </div>
-          <div class="form-group">
-            <label>主机地址</label>
-            <input type="text" v-model="proxyHostname" placeholder="127.0.0.1"/>
-          </div>
-          <div class="form-group">
-            <label>端口</label>
-            <input type="number" v-model.number="proxyPort" placeholder="1080"/>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>用户名</label>
-            <input type="text" v-model="proxyUsername" placeholder="可选"/>
-          </div>
-          <div class="form-group">
-            <label>密码</label>
-            <input type="password" v-model="proxyPassword" placeholder="可选"/>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>频道列表</h2>
-        <div v-for="(ch, i) in channels" :key="i" class="channel-row">
-          <input class="channel-input" v-model="channels[i]" placeholder="频道用户名"/>
-          <button class="btn btn-danger btn-sm" @click="removeChannel(i)">删除</button>
-        </div>
-        <button class="btn btn-secondary" @click="addChannel">+ 添加频道</button>
-      </div>
-
-      <div class="card">
-        <h2>存储路径</h2>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Session 目录</label>
-            <input type="text" v-model="sessionDir"/>
-          </div>
-          <div class="form-group">
-            <label>下载目录</label>
-            <div class="dir-input-group">
-              <input type="text" v-model="downloadDir"/>
-              <button class="btn btn-secondary btn-sm" @click="openDirPicker">选择目录</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="form-actions">
         <button class="btn btn-primary" @click="doSaveConfig">保存配置</button>
         <button class="btn btn-success" @click="doStartDownload">开始下载</button>
@@ -356,7 +369,6 @@ onMounted(() => {
 
     <div class="toast" :class="{ show: toastMsg }">{{ toastMsg }}</div>
 
-    <!-- Directory Picker Modal -->
     <div v-if="showDirPicker" class="dir-picker-overlay" @click.self="showDirPicker = false">
       <div class="dir-picker-card">
         <div class="dir-picker-header">
