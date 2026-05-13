@@ -5,7 +5,7 @@ import {
   getDownloadList, downloadSingle, quickTest,
   setAdminPassword, getAdminPassword,
 } from '../api/http'
-import { connect, onMessage, disconnect, WSMessage } from '../api/ws'
+import { connect, onMessage, disconnect } from '../api/ws'
 
 const showLogin = ref(!getAdminPassword())
 const loginPassword = ref('')
@@ -53,7 +53,7 @@ function initPage(data: any) {
     logs.value = snapshot.logs || []
   })
 
-  onMessage((msg: WSMessage) => {
+  onMessage((msg: any) => {
     if (msg.type === 'log') {
       logs.value.push(msg.payload)
     } else if (msg.type === 'download_status') {
