@@ -101,7 +101,6 @@ func (s *Server) ensureTelegramClient() error {
 
 func (s *Server) registerRoutes() {
 	s.router.Use(corsMiddleware())
-	s.router.NoRoute(s.spaFallback())
 
 	s.router.GET("/api/ws", s.hub.HandleWS)
 
@@ -125,6 +124,53 @@ func (s *Server) registerRoutes() {
 	api.GET("/download/list", s.getDownloadList)
 	api.POST("/download/single", s.downloadSingle)
 	api.POST("/download/quick_test", s.quickTest)
+
+	// Gateway mode routes (prefix: /app/telegram-music)
+	s.registerGatewayRoutes("/app/telegram-music")
+
+	// SPA fallback for all other unmatched routes
+	s.router.NoRoute(s.spaFallback())
+}
+
+func (s *Server) registerGatewayRoutes(prefix string) {
+	indexHTML, err := fs.ReadFile(s.webFS, "index.html")
+	if err != nil {
+		indexHTML = []byte("<h1>Frontend not built</h1>")
+	}
+
+	s.router.GET(prefix+"/assets/*filepath", func(c *gin.Context) {
+		filepath := c.Param("filepath")
+		if file, err := fs.ReadFile(s.webFS, "assets"+filepath); err == nil {
+			c.Data(http.StatusOK, s.mimeFor(filepath), file)
+		} else {
+			c.Status(http.StatusNotFound)
+		}
+	})
+
+	s.router.GET(prefix+"/", func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+	})
+}
+
+func (s *Server) mimeFor(path string) string {
+	switch {
+	case len(path) > 3 && path[len(path)-3:] == ".js":
+		return "application/javascript; charset=utf-8"
+	case len(path) > 4 && path[len(path)-4:] == ".css":
+		return "text/css; charset=utf-8"
+	case len(path) > 4 && path[len(path)-4:] == ".png":
+		return "image/png"
+	case len(path) > 4 && path[len(path)-4:] == ".svg":
+		return "image/svg+xml"
+	case len(path) > 4 && path[len(path)-4:] == ".ico":
+		return "image/x-icon"
+	case len(path) > 4 && path[len(path)-4:] == ".woff":
+		return "font/woff"
+	case len(path) > 5 && path[len(path)-5:] == ".woff2":
+		return "font/woff2"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 func (s *Server) spaFallback() gin.HandlerFunc {
