@@ -41,6 +41,18 @@
             "message": "端口号必须是数字"
           }
         ]
+      },
+      {
+        "type": "text",
+        "field": "wizard_download_dir",
+        "label": "下载目录",
+        "initValue": "/vol1/telegram-music",
+        "rules": [
+          {
+            "required": true,
+            "message": "请输入下载目录路径"
+          }
+        ]
       }
     ]
   }
