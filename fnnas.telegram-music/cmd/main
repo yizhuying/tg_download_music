@@ -28,6 +28,12 @@ fi
 echo "TRIM_PKGVAR='${TRIM_PKGVAR:-}'" >> "${LOG_FILE}" 2>/dev/null || true
 echo "APP_ROOT='${APP_ROOT}'" >> "${LOG_FILE}" 2>/dev/null || true
 echo "APP_PORT='${APP_PORT}'" >> "${LOG_FILE}" 2>/dev/null || true
+echo "TRIM_DATA_ACCESSIBLE_PATHS='${TRIM_DATA_ACCESSIBLE_PATHS:-}'" >> "${LOG_FILE}" 2>/dev/null || true
+
+# Export fnOS data paths for the Go process
+if [ -n "${TRIM_DATA_ACCESSIBLE_PATHS:-}" ]; then
+    export TRIM_DATA_ACCESSIBLE_PATHS
+fi
 
 echo "应用端口: $APP_PORT"
 
