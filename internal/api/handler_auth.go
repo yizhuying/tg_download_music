@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"telegram-music/internal/telegram"
 
@@ -50,8 +51,20 @@ func (s *Server) sendCode(c *gin.Context) {
 
 	result, err := s.tgClient.SendCode(context.Background(), req.PhoneNumber)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		// AUTH_RESTART means we need to retry after resetting the client
+		if strings.Contains(err.Error(), "AUTH_RESTART") {
+			s.tgClient = nil
+			s.cancelRunning = nil
+			if err := s.ensureTelegramClient(); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			result, err = s.tgClient.SendCode(context.Background(), req.PhoneNumber)
+		}
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	s.authStateMu.Lock()

@@ -23,6 +23,9 @@ func main() {
 	sessionDir := flag.String("session-dir", "", "override session directory")
 	socketPath := flag.String("socket", "", "unix socket path for gateway mode")
 	flag.Parse()
+	// todo 增加返回授权文件夹列表接口
+	// todo 增加按照时密码设置
+	// todo 增加代理验证
 
 	listenAddr := fmt.Sprintf(":%d", *port)
 	cfg, err := config.NewManager(*configPath)
@@ -42,10 +45,6 @@ func main() {
 	}
 
 	webFS, _ := fs.Sub(distFS, "dist")
-
-	// Log fnOS accessible paths for debugging
-	accessiblePaths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
-	log.Printf("TRIM_DATA_ACCESSIBLE_PATHS: %s\n", accessiblePaths)
 
 	srv := api.NewServer(cfg, webFS)
 

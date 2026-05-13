@@ -32,7 +32,7 @@ type Server struct {
 	logger          *zap.Logger
 }
 
-// NewServer creates a new Server with all sub-components initialized.
+// NewServer creates a new Server with all subcomponents initialized.
 func NewServer(cfg *config.Manager, webFS fs.FS) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
@@ -125,7 +125,6 @@ func (s *Server) registerRoutes() {
 	api.POST("/download/single", s.downloadSingle)
 	api.POST("/download/quick_test", s.quickTest)
 	api.GET("/download/dirs", s.listDirs)
-	api.GET("/download/volumes", s.getVolumes)
 
 	// Serve static assets (for CGI / standalone mode)
 	s.registerStaticRoutes()
