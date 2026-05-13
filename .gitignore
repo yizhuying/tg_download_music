@@ -28,3 +28,4 @@ web/dist/
 
 # fnOS packages
 *.fpk
+/fnnas.telegram-music/app/server/telegram-music-server

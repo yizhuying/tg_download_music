@@ -4,22 +4,22 @@
         "shares":
         [
             {
-                "name": "App.Native.Telegram_music_downloads",
+                "name": "Telegram_music_downloads",
                 "permission":
                 {
                     "rw":
                     [
-                        "App.Native.Telegram_music_downloads"
+                        "Telegram_music_downloads"
                     ]
                 }
             },
             {
-                "name": "App.Native.Telegram_music_downloads/data",
+                "name": "Telegram_music_downloads/data",
                 "permission":
                 {
                     "rw":
                     [
-                        "App.Native.Telegram_music_downloads"
+                        "Telegram_music_downloads"
                     ]
                 }
             }

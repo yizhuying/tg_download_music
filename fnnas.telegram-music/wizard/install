@@ -1,5 +1,29 @@
 [
   {
+    "stepTitle": "欢迎安装",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "欢迎使用 Telegram Music！在开始使用前，请阅读并同意我们的服务条款。"
+      },
+      {
+        "type": "tips",
+        "helpText": "请阅读 <a target=\"_blank\" href=\"https://example.com/privacy\">隐私政策</a> 和 <a target=\"_blank\" href=\"https://example.com/terms\">服务条款</a>。"
+      },
+      {
+        "type": "switch",
+        "field": "wizard_agree_terms",
+        "label": "我已阅读并同意服务条款",
+        "rules": [
+          {
+            "required": true,
+            "message": "请同意服务条款"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "stepTitle": "应用配置",
     "items": [
       {
