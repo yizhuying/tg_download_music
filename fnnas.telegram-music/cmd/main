@@ -40,14 +40,17 @@ echo "应用端口: $APP_PORT"
 # Construct paths relative to actual install directory
 SERVER_BIN="${APP_ROOT}/server/telegram-music-server"
 CONFIG_FILE="${APP_ROOT}/config.json"
-SESSION_DIR="${APP_ROOT}/sessions"
 SOCKET_FILE="${APP_ROOT}/app.sock"
+
+# Data directory (writable by app user: /vol1/@appdata/<appname>)
+APP_DATA="${PKG_ROOT}/var"
+SESSION_DIR="${APP_DATA}/sessions"
 
 # Ensure session directory exists
 mkdir -p "${SESSION_DIR}"
 
 # write the command to start your program here
-CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE}"
+CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE} -session-dir ${SESSION_DIR}"
 if [ -n "${DOWNLOAD_DIR}" ]; then
     CMD="${CMD} -download-dir ${DOWNLOAD_DIR}"
 fi

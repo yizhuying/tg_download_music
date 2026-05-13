@@ -20,6 +20,7 @@ func main() {
 	port := flag.Int("port", 8080, "server listen port")
 	configPath := flag.String("config", "config.json", "config file path")
 	downloadDir := flag.String("download-dir", "", "override download directory")
+	sessionDir := flag.String("session-dir", "", "override session directory")
 	socketPath := flag.String("socket", "", "unix socket path for gateway mode")
 	flag.Parse()
 
@@ -32,6 +33,11 @@ func main() {
 	if *downloadDir != "" {
 		c := cfg.Get()
 		c.DownloadDir = *downloadDir
+		_ = cfg.Save(c)
+	}
+	if *sessionDir != "" {
+		c := cfg.Get()
+		c.SessionDir = *sessionDir
 		_ = cfg.Save(c)
 	}
 
