@@ -32,10 +32,11 @@ type ScannedMessage struct {
 
 // DownloadState holds thread-safe download state and scanned messages.
 type DownloadState struct {
-	mu       sync.RWMutex
-	state    State
-	messages []ScannedMessage
-	scannedAt string
+	mu          sync.RWMutex
+	state       State
+	messages    []ScannedMessage
+	scannedAt   string
+	broadcaster func(typ string, data interface{})
 }
 
 // NewDownloadState creates a new DownloadState with initialized logs slice.
@@ -75,6 +76,11 @@ func (ds *DownloadState) IncrementDownloaded() {
 	ds.state.TotalDownloaded++
 }
 
+// SetBroadcaster sets an optional callback for broadcasting log entries.
+func (ds *DownloadState) SetBroadcaster(fn func(typ string, data interface{})) {
+	ds.broadcaster = fn
+}
+
 // AddLog appends a timestamped log entry and returns it.
 func (ds *DownloadState) AddLog(msg string) LogEntry {
 	ds.mu.Lock()
@@ -86,6 +92,12 @@ func (ds *DownloadState) AddLog(msg string) LogEntry {
 	ds.state.Logs = append(ds.state.Logs, entry)
 	if len(ds.state.Logs) > 500 {
 		ds.state.Logs = ds.state.Logs[len(ds.state.Logs)-500:]
+	}
+	if ds.broadcaster != nil {
+		ds.broadcaster("log", map[string]string{
+			"time":    entry.Time,
+			"message": entry.Message,
+		})
 	}
 	return entry
 }

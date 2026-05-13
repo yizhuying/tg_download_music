@@ -85,7 +85,11 @@ func (s *Server) ensureTelegramClient() error {
 	}
 
 	s.tgClient = client
-	s.downloadManager = download.NewManager(client, s.downloadState, s.hub)
+	dlState := s.downloadState
+	dlState.SetBroadcaster(func(typ string, data interface{}) {
+		s.hub.Broadcast(typ, data)
+	})
+	s.downloadManager = download.NewManager(client, dlState, s.hub)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.runningCtx = ctx
