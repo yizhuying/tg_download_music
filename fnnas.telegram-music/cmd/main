@@ -24,12 +24,6 @@ if [ -z "${APP_PORT}" ]; then
     APP_PORT="8080"
 fi
 
-# Download directory from wizard
-DOWNLOAD_DIR="${wizard_download_dir}"
-if [ -n "${DOWNLOAD_DIR}" ]; then
-    mkdir -p "${DOWNLOAD_DIR}"
-fi
-
 # Debug
 echo "TRIM_PKGVAR='${TRIM_PKGVAR:-}'" >> "${LOG_FILE}" 2>/dev/null || true
 echo "APP_ROOT='${APP_ROOT}'" >> "${LOG_FILE}" 2>/dev/null || true
@@ -51,9 +45,6 @@ mkdir -p "${SESSION_DIR}"
 
 # write the command to start your program here
 CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE} -session-dir ${SESSION_DIR}"
-if [ -n "${DOWNLOAD_DIR}" ]; then
-    CMD="${CMD} -download-dir ${DOWNLOAD_DIR}"
-fi
 
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"

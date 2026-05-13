@@ -124,21 +124,23 @@ func (s *Server) registerRoutes() {
 	api.GET("/download/list", s.getDownloadList)
 	api.POST("/download/single", s.downloadSingle)
 	api.POST("/download/quick_test", s.quickTest)
+	api.GET("/download/dirs", s.listDirs)
+	api.GET("/download/volumes", s.getVolumes)
 
-	// Gateway mode routes (prefix: /app/telegram-music)
-	s.registerGatewayRoutes("/app/telegram-music")
+	// Serve static assets (for CGI / standalone mode)
+	s.registerStaticRoutes()
 
 	// SPA fallback for all other unmatched routes
 	s.router.NoRoute(s.spaFallback())
 }
 
-func (s *Server) registerGatewayRoutes(prefix string) {
+func (s *Server) registerStaticRoutes() {
 	indexHTML, err := fs.ReadFile(s.webFS, "index.html")
 	if err != nil {
 		indexHTML = []byte("<h1>Frontend not built</h1>")
 	}
 
-	s.router.GET(prefix+"/assets/*filepath", func(c *gin.Context) {
+	s.router.GET("/assets/*filepath", func(c *gin.Context) {
 		filepath := c.Param("filepath")
 		if file, err := fs.ReadFile(s.webFS, "assets"+filepath); err == nil {
 			c.Data(http.StatusOK, s.mimeFor(filepath), file)
@@ -147,7 +149,7 @@ func (s *Server) registerGatewayRoutes(prefix string) {
 		}
 	})
 
-	s.router.GET(prefix+"/", func(c *gin.Context) {
+	s.router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 	})
 }
@@ -185,10 +187,6 @@ func (s *Server) spaFallback() gin.HandlerFunc {
 
 // Run starts the HTTP server on the given address.
 func (s *Server) Run(addr string) error {
-	assetsFS, err := fs.Sub(s.webFS, "assets")
-	if err == nil {
-		s.router.StaticFS("/assets", http.FS(assetsFS))
-	}
 	return s.router.Run(addr)
 }
 

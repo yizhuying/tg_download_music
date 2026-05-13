@@ -3,6 +3,11 @@ package api
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -104,4 +109,73 @@ func (s *Server) quickTest(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "快速测试已启动"})
+}
+
+func (s *Server) getVolumes(c *gin.Context) {
+	volumes := []string{}
+	for i := 1; i <= 10; i++ {
+		p := "/vol" + strconv.Itoa(i)
+		if _, err := os.Stat(p); err == nil {
+			volumes = append(volumes, p)
+		}
+	}
+	if len(volumes) == 0 {
+		volumes = append(volumes, "/vol1")
+	}
+	c.JSON(http.StatusOK, gin.H{"volumes": volumes})
+}
+
+func (s *Server) listDirs(c *gin.Context) {
+	reqPath := c.Query("path")
+	if reqPath == "" {
+		vols := []string{}
+		for i := 1; i <= 10; i++ {
+			p := "/vol" + strconv.Itoa(i)
+			if _, err := os.Stat(p); err == nil {
+				vols = append(vols, p)
+			}
+		}
+		if len(vols) == 0 {
+			vols = []string{"/vol1"}
+		}
+		c.JSON(http.StatusOK, gin.H{"parent": "/", "dirs": volsToDirs(vols)})
+		return
+	}
+
+	entries, err := os.ReadDir(reqPath)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"parent": parentOf(reqPath), "dirs": []gin.H{}})
+		return
+	}
+
+	dirs := []gin.H{}
+	for _, e := range entries {
+		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
+			dirs = append(dirs, gin.H{
+				"name": e.Name(),
+				"path": filepath.Join(reqPath, e.Name()),
+			})
+		}
+	}
+	sort.Slice(dirs, func(i, j int) bool {
+		return dirs[i]["name"].(string) < dirs[j]["name"].(string)
+	})
+
+	c.JSON(http.StatusOK, gin.H{"parent": parentOf(reqPath), "dirs": dirs})
+}
+
+func parentOf(p string) string {
+	parent := filepath.Dir(p)
+	if parent == p {
+		return "/"
+	}
+	return parent
+}
+
+func volsToDirs(vols []string) []gin.H {
+	dirs := []gin.H{}
+	for _, v := range vols {
+		dirs = append(dirs, gin.H{"name": v, "path": v})
+	}
+	return dirs
 }

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import {ref, onMounted} from 'vue'
 import {
   getConfig, saveConfig, getAuthStatus, sendCode, signIn, logout,
-  setAdminPassword, getAdminPassword, startDownload,
+  setAdminPassword, getAdminPassword, startDownload, getDirs,
 } from '../api/http'
-import { useRouter } from 'vue-router'
+import {useRouter} from 'vue-router'
 
 const router = useRouter()
 
@@ -35,13 +35,46 @@ const auth2FA = ref('')
 
 const toastMsg = ref('')
 
+const showDirPicker = ref(false)
+const pickerPath = ref('/vol1')
+const pickerDirs = ref<{ name: string; path: string }[]>([])
+const pickerParent = ref('')
+const pickerLoading = ref(false)
+
+async function openDirPicker() {
+  showDirPicker.value = true
+  await navigateToDir('/')
+}
+
+async function navigateToDir(path: string) {
+  pickerLoading.value = true
+  try {
+    const data = await getDirs(path)
+    pickerParent.value = data.parent
+    pickerDirs.value = data.dirs
+    pickerPath.value = path || '/'
+  } finally {
+    pickerLoading.value = false
+  }
+}
+
+function selectCurrentDir() {
+  downloadDir.value = pickerPath.value
+  showDirPicker.value = false
+}
+
 function showToast(msg: string) {
   toastMsg.value = msg
-  setTimeout(() => { toastMsg.value = '' }, 3000)
+  setTimeout(() => {
+    toastMsg.value = ''
+  }, 3000)
 }
 
 async function doLogin() {
-  if (!password.value) { loginError.value = '请输入密码'; return }
+  if (!password.value) {
+    loginError.value = '请输入密码';
+    return
+  }
   setAdminPassword(password.value)
   try {
     const data = await getConfig()
@@ -156,14 +189,19 @@ async function doSaveConfig() {
 async function doStartDownload() {
   try {
     await startDownload()
-    router.push('/download')
+    await router.push('/download')
   } catch (e: any) {
     showToast(e.response?.data?.error || '启动失败')
   }
 }
 
-function addChannel() { channels.value.push('') }
-function removeChannel(i: number) { channels.value.splice(i, 1) }
+function addChannel() {
+  channels.value.push('')
+}
+
+function removeChannel(i: number) {
+  channels.value.splice(i, 1)
+}
 
 onMounted(() => {
   if (password.value) {
@@ -183,7 +221,7 @@ onMounted(() => {
         <div class="form-group">
           <label>密码</label>
           <input type="password" v-model="password" placeholder="输入管理密码"
-            @keydown.enter="doLogin" />
+                 @keydown.enter="doLogin"/>
         </div>
         <div class="login-error">{{ loginError }}</div>
         <button class="btn btn-primary" style="width:100%" @click="doLogin">登录</button>
@@ -198,7 +236,7 @@ onMounted(() => {
           <div class="form-row">
             <div class="form-group">
               <label>手机号</label>
-              <input type="text" v-model="authPhone" placeholder="+8613800138000" />
+              <input type="text" v-model="authPhone" placeholder="+8613800138000"/>
             </div>
             <div class="form-group">
               <button class="btn btn-info" @click="doSendCode">发送验证码</button>
@@ -208,7 +246,7 @@ onMounted(() => {
             <div class="form-row">
               <div class="form-group">
                 <label>验证码</label>
-                <input type="text" v-model="authCode" placeholder="SMS 验证码" />
+                <input type="text" v-model="authCode" placeholder="SMS 验证码"/>
               </div>
               <div class="form-group">
                 <button class="btn btn-success" @click="doSignIn">登录</button>
@@ -218,7 +256,7 @@ onMounted(() => {
               <div class="form-row">
                 <div class="form-group">
                   <label>两步验证密码</label>
-                  <input type="password" v-model="auth2FA" placeholder="2FA 密码" />
+                  <input type="password" v-model="auth2FA" placeholder="2FA 密码"/>
                 </div>
                 <div class="form-group">
                   <button class="btn btn-success" @click="doSignIn2FA">登录</button>
@@ -240,15 +278,15 @@ onMounted(() => {
         <h2>API 凭证</h2>
         <div class="form-group">
           <label>API ID</label>
-          <input type="number" v-model.number="apiId" />
+          <input type="number" v-model.number="apiId"/>
         </div>
         <div class="form-group">
           <label>API Hash</label>
-          <input type="text" v-model="apiHash" />
+          <input type="password" v-model="apiHash"/>
         </div>
         <div class="form-group">
           <label>Session 名称</label>
-          <input type="text" v-model="sessionName" />
+          <input type="text" v-model="sessionName"/>
         </div>
       </div>
 
@@ -259,27 +297,27 @@ onMounted(() => {
             <label>代理类型</label>
             <select v-model="proxyScheme">
               <option value="socks5">SOCKS5</option>
-              <option value="socks4">SOCKS4</option>
-              <option value="http">HTTP</option>
+              <!--              <option value="socks4">SOCKS4</option>-->
+              <!--              <option value="http">HTTP</option>-->
             </select>
           </div>
           <div class="form-group">
             <label>主机地址</label>
-            <input type="text" v-model="proxyHostname" placeholder="127.0.0.1" />
+            <input type="text" v-model="proxyHostname" placeholder="127.0.0.1"/>
           </div>
           <div class="form-group">
             <label>端口</label>
-            <input type="number" v-model.number="proxyPort" placeholder="1080" />
+            <input type="number" v-model.number="proxyPort" placeholder="1080"/>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>用户名</label>
-            <input type="text" v-model="proxyUsername" placeholder="可选" />
+            <input type="text" v-model="proxyUsername" placeholder="可选"/>
           </div>
           <div class="form-group">
             <label>密码</label>
-            <input type="password" v-model="proxyPassword" placeholder="可选" />
+            <input type="password" v-model="proxyPassword" placeholder="可选"/>
           </div>
         </div>
       </div>
@@ -287,7 +325,7 @@ onMounted(() => {
       <div class="card">
         <h2>频道列表</h2>
         <div v-for="(ch, i) in channels" :key="i" class="channel-row">
-          <input class="channel-input" v-model="channels[i]" placeholder="频道用户名" />
+          <input class="channel-input" v-model="channels[i]" placeholder="频道用户名"/>
           <button class="btn btn-danger btn-sm" @click="removeChannel(i)">删除</button>
         </div>
         <button class="btn btn-secondary" @click="addChannel">+ 添加频道</button>
@@ -298,11 +336,14 @@ onMounted(() => {
         <div class="form-row">
           <div class="form-group">
             <label>Session 目录</label>
-            <input type="text" v-model="sessionDir" />
+            <input type="text" v-model="sessionDir"/>
           </div>
           <div class="form-group">
             <label>下载目录</label>
-            <input type="text" v-model="downloadDir" />
+            <div class="dir-input-group">
+              <input type="text" v-model="downloadDir"/>
+              <button class="btn btn-secondary btn-sm" @click="openDirPicker">选择目录</button>
+            </div>
           </div>
         </div>
       </div>
@@ -314,5 +355,50 @@ onMounted(() => {
     </div>
 
     <div class="toast" :class="{ show: toastMsg }">{{ toastMsg }}</div>
+
+    <!-- Directory Picker Modal -->
+    <div v-if="showDirPicker" class="dir-picker-overlay" @click.self="showDirPicker = false">
+      <div class="dir-picker-card">
+        <div class="dir-picker-header">
+          <h3>选择下载目录</h3>
+          <button class="dir-picker-close" @click="showDirPicker = false">✕</button>
+        </div>
+        <div class="dir-picker-breadcrumb">
+          <span class="dir-breadcrumb-item" @click="navigateToDir('/')">/</span>
+          <template v-for="(part, i) in pickerPath.split('/').filter(Boolean)" :key="i">
+            <span>/</span>
+            <span class="dir-breadcrumb-item"
+                  @click="navigateToDir('/' + pickerPath.split('/').filter(Boolean).slice(0, i + 1).join('/'))">{{
+                part
+              }}</span>
+          </template>
+        </div>
+        <div class="dir-picker-loading" v-if="pickerLoading">加载中...</div>
+        <div class="dir-picker-list" v-else>
+          <div
+              v-for="dir in pickerDirs"
+              :key="dir.path"
+              class="dir-picker-item"
+              @click="navigateToDir(dir.path)"
+          >
+            <span class="dir-icon">📁</span>
+            <span class="dir-name">{{ dir.name }}</span>
+          </div>
+          <div v-if="pickerDirs.length === 0" class="dir-picker-empty">
+            没有子目录
+          </div>
+        </div>
+        <div class="dir-picker-footer">
+          <button
+              class="btn btn-secondary btn-sm"
+              :disabled="pickerPath === '/'"
+              @click="navigateToDir(pickerParent)"
+          >
+            返回上一级
+          </button>
+          <button class="btn btn-primary" @click="selectCurrentDir">选择</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

@@ -81,3 +81,8 @@ export async function quickTest() {
   const res = await http.post('/download/quick_test')
   return res.data
 }
+
+export async function getDirs(path: string) {
+  const res = await http.get('/download/dirs', { params: { path } })
+  return res.data as { parent: string; dirs: { name: string; path: string }[] }
+}

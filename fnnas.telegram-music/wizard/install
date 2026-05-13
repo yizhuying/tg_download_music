@@ -4,7 +4,7 @@
     "items": [
       {
         "type": "tips",
-        "helpText": "欢迎使用 Telegram Music！在开始使用前，请阅读并同意我们的服务条款。"
+        "helpText": "欢迎使用 TMusicDownloader 在开始使用前，请阅读并同意我们的服务条款。"
       },
       {
         "type": "tips",
@@ -39,18 +39,6 @@
           {
             "pattern": "^[0-9]+$",
             "message": "端口号必须是数字"
-          }
-        ]
-      },
-      {
-        "type": "text",
-        "field": "wizard_download_dir",
-        "label": "下载目录",
-        "initValue": "/vol1/telegram-music",
-        "rules": [
-          {
-            "required": true,
-            "message": "请输入下载目录路径"
           }
         ]
       }

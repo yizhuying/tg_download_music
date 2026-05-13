@@ -43,31 +43,33 @@ func main() {
 
 	webFS, _ := fs.Sub(distFS, "dist")
 
-	srv := api.NewServer(cfg, webFS)
-	log.Printf("Starting Telegram Music Manager: http://localhost%s\n", listenAddr)
+	// Log fnOS accessible paths for debugging
+	accessiblePaths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
+	log.Printf("TRIM_DATA_ACCESSIBLE_PATHS: %s\n", accessiblePaths)
 
+	srv := api.NewServer(cfg, webFS)
+
+	// Listen on HTTP port
+	go func() {
+		log.Printf("Starting Telegram Music Manager: http://localhost%s\n", listenAddr)
+		if err := srv.Run(listenAddr); err != nil {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	// Also listen on Unix socket if specified (for gateway mode)
 	if *socketPath != "" {
 		os.Remove(*socketPath)
+		log.Printf("Also listening on unix socket: %s\n", *socketPath)
 		go func() {
-			log.Printf("Listening on unix socket: %s\n", *socketPath)
 			if err := srv.RunUnix(*socketPath); err != nil {
 				log.Fatalf("Unix socket server failed: %v", err)
 			}
 		}()
 	}
 
-	go func() {
-		if err := srv.Run(listenAddr); err != nil {
-			log.Fatalf("Server failed: %v", err)
-		}
-	}()
-
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down...")
-
-	if *socketPath != "" {
-		os.Remove(*socketPath)
-	}
 }
