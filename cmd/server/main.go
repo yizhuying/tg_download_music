@@ -19,13 +19,9 @@ var distFS embed.FS
 func main() {
 	port := flag.Int("port", 8080, "server listen port")
 	configPath := flag.String("config", "config.json", "config file path")
-	downloadDir := flag.String("download-dir", "", "override download directory")
-	sessionDir := flag.String("session-dir", "", "override session directory")
 	socketPath := flag.String("socket", "", "unix socket path for gateway mode")
+	adminPassword := flag.String("admin-password", "", "set admin password (overrides env var)")
 	flag.Parse()
-	// todo 增加返回授权文件夹列表接口
-	// todo 增加按照时密码设置
-	// todo 增加代理验证
 
 	listenAddr := fmt.Sprintf(":%d", *port)
 	cfg, err := config.NewManager(*configPath)
@@ -33,15 +29,8 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	if *downloadDir != "" {
-		c := cfg.Get()
-		c.DownloadDir = *downloadDir
-		_ = cfg.Save(c)
-	}
-	if *sessionDir != "" {
-		c := cfg.Get()
-		c.SessionDir = *sessionDir
-		_ = cfg.Save(c)
+	if *adminPassword != "" {
+		os.Setenv("ADMIN_PASSWORD", *adminPassword)
 	}
 
 	webFS, _ := fs.Sub(distFS, "dist")

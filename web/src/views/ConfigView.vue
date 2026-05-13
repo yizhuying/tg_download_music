@@ -2,7 +2,7 @@
 import {ref, onMounted} from 'vue'
 import {
   getConfig, saveConfig, getAuthStatus, sendCode, signIn, logout,
-  setAdminPassword, getAdminPassword, startDownload, getDirs, getDownloadDirList
+  setAdminPassword, getAdminPassword, startDownload, getDirs, getDownloadDirList, testProxy
 } from '../api/http'
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -36,6 +36,7 @@ const auth2FA = ref('')
 
 const pickerDirs = ref<string[]>([])
 const pickerLoading = ref(false)
+const proxyLoading = ref(false)
 
 async function loadDirOptions() {
   try {
@@ -195,6 +196,26 @@ async function doSaveConfig() {
   }
 }
 
+async function doTestProxy() {
+  if (proxyScheme.value === 'none') {
+    showToast('代理未配置')
+    return
+  }
+  proxyLoading.value = true
+  try {
+    const data = await testProxy()
+    if (data.ok) {
+      showToast(data.message)
+    } else {
+      showError(data.message)
+    }
+  } catch (e: any) {
+    showError(e.response?.data?.error || '测试失败')
+  } finally {
+    proxyLoading.value = false
+  }
+}
+
 async function doStartDownload() {
   try {
     await startDownload()
@@ -289,8 +310,11 @@ onMounted(() => {
       </div>
 
       <div class="card">
-        <h2>代理配置</h2>
-        <div class="form-row-5">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2>代理配置</h2>
+          <el-button :loading="proxyLoading" :disabled="proxyLoading" style="background-color:darksalmon;color:#fff" @click="doTestProxy">测试代理</el-button>
+        </div>
+        <div class="form-row-6">
           <div class="form-group">
             <label>代理类型</label>
             <el-select v-model="proxyScheme" style="width:100%">

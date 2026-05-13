@@ -109,6 +109,7 @@ func (s *Server) registerRoutes() {
 
 	api.GET("/config", s.getConfig)
 	api.POST("/config", s.saveConfig)
+	api.POST("/config/proxy/test", s.testProxy)
 
 	// Auth routes
 	api.GET("/auth/status", s.getAuthStatus)

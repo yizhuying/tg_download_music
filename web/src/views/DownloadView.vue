@@ -29,6 +29,7 @@ interface ScannedFile {
 const messages = ref<ScannedFile[]>([])
 const searchInput = ref('')
 const filterHideDownloaded = ref(false)
+const toastMsg = ref('')
 
 function doLogin() {
   if (!loginPassword.value) { loginError.value = '请输入密码'; return }
@@ -130,48 +131,56 @@ onUnmounted(() => { disconnect() })
         <h2>管理登录</h2>
         <div class="form-group">
           <label>密码</label>
-          <input type="password" v-model="loginPassword" placeholder="输入管理密码"
+          <el-input type="password" v-model="loginPassword" placeholder="输入管理密码"
             @keydown.enter="doLogin" />
         </div>
         <div class="login-error">{{ loginError }}</div>
-        <button class="btn btn-primary" style="width:100%" @click="doLogin">登录</button>
+        <el-button class="btn btn-primary" style="width:100%" @click="doLogin">登录</el-button>
       </div>
     </div>
 
     <div v-if="!showLogin">
       <div class="card">
         <h2>下载控制</h2>
-        <div class="form-actions" style="flex-wrap:wrap">
-          <button class="btn btn-info" @click="doQuickTest">快速测试</button>
-          <button class="btn btn-success" @click="doScan">扫描文件列表</button>
-          <button class="btn btn-success" @click="doStartAll">全部下载</button>
-        </div>
-        <div style="font-size:0.8rem;color:#888;margin-top:8px">
-          快速测试：自动下载第一个频道的第一条音频，用于验证功能
+        <div class="form-row" style="gap: 4px; align-items: flex-end">
+          <div class="form-group" style="flex: none">
+            <el-button type="info" @click="doQuickTest">快速测试</el-button>
+          </div>
+          <div class="form-group" style="flex: none">
+            <el-button type="warning" @click="doScan">扫描文件列表</el-button>
+          </div>
+          <div class="form-group" style="flex: none">
+            <el-button type="success" @click="doStartAll">全部下载</el-button>
+          </div>
+          <div class="form-group">
+            <span style="font-size:0.75rem;color:#888">快速测试：自动下载第一个频道的第一条音频，用于验证功能</span>
+          </div>
         </div>
       </div>
 
       <div class="card">
         <h2>下载状态</h2>
-        <div class="status-bar">
-          <span class="badge" :class="running ? 'running' : 'idle'">{{ running ? '运行中' : '空闲' }}</span>
-          <span>{{ currentChannel }}</span>
-        </div>
-        <div class="status-details">
-          <div><strong>已下载:</strong> {{ totalDownloaded }} 个文件</div>
-          <div><strong>开始时间:</strong> {{ startedAt }}</div>
-          <div><strong>扫描时间:</strong> {{ scannedAt }}</div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-danger" :disabled="!running" @click="doStop">停止下载</button>
+        <div class="form-row" style="gap: 4px; align-items: flex-end">
+          <div class="form-group" style="flex: none">
+            <span class="badge" :class="running ? 'running' : 'idle'">{{ running ? '运行中' : '空闲' }}</span>
+            <span style="font-size:0.78rem">{{ currentChannel }}</span>
+          </div>
+          <div class="form-group" style="flex: none">
+            <el-button type="danger" :disabled="!running" @click="doStop">停止下载</el-button>
+          </div>
+          <div class="form-group">
+            <span style="font-size:0.75rem;color:#888">已下载: {{ totalDownloaded }} 个 | 开始: {{ startedAt }} | 扫描: {{ scannedAt }}</span>
+          </div>
         </div>
       </div>
 
       <div class="card">
-        <h2>文件列表 <span>({{ filteredMessages.length }}/{{ messages.length }})</span></h2>
-        <div class="filter-bar">
-          <label><input type="checkbox" v-model="filterHideDownloaded" @change="applyFilters"> 隐藏已下载</label>
-          <input type="text" v-model="searchInput" placeholder="搜索文件名..." @input="applyFilters" />
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:6px">
+          <h2>文件列表 <span>({{ filteredMessages.length }}/{{ messages.length }})</span></h2>
+          <div style="display:flex;gap:8px;align-items:center">
+            <el-checkbox v-model="filterHideDownloaded" @change="applyFilters">隐藏已下载</el-checkbox>
+            <el-input v-model="searchInput" placeholder="搜索文件名..." @input="applyFilters" style="width:150px"/>
+          </div>
         </div>
         <div class="file-list">
           <div v-if="filteredMessages.length === 0" class="empty-tip">暂无文件，请先扫描</div>
@@ -181,8 +190,8 @@ onUnmounted(() => { disconnect() })
               <div class="file-name">{{ m.file_name }}</div>
               <div class="file-meta">{{ m.channel_title }} | {{ formatSize(m.file_size) }} {{ m.exists ? '[已下载]' : '' }}</div>
             </div>
-            <button v-if="!m.exists" class="btn btn-sm btn-primary"
-              @click="doDownloadSingle(m.channel, m.msg_id)">下载</button>
+            <el-button v-if="!m.exists" class="btn btn-sm btn-primary"
+              @click="doDownloadSingle(m.channel, m.msg_id)">下载</el-button>
             <span v-else class="badge badge-done">已完成</span>
           </div>
         </div>

@@ -96,9 +96,9 @@ nav a.active, nav a:hover {
     gap: 8px;
 }
 
-.form-row-5 {
+.form-row-6 {
     display: grid;
-    grid-template-columns: 100px 120px 80px 120px 160px;
+    grid-template-columns: 80px 120px 60px 120px 140px auto;
     gap: 10px;
 }
 
@@ -200,7 +200,8 @@ nav a.active, nav a:hover {
 }
 
 .logs-container {
-    max-height: 80px;
+    min-height: 120px;
+    max-height: 150px;
     overflow-y: auto;
     background: #1e1e1e;
     color: #d4d4d4;

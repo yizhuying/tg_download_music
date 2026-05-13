@@ -1,7 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+
+	"golang.org/x/net/proxy"
+
 	"telegram-music/internal/config"
 
 	"github.com/gin-gonic/gin"
@@ -46,4 +50,34 @@ func (s *Server) saveConfig(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "配置已保存"})
+}
+
+func (s *Server) testProxy(c *gin.Context) {
+	cfg := s.config.Get()
+	p := cfg.Proxy
+	if p.Scheme == "none" || p.Hostname == "" || p.Port == 0 {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "代理未配置"})
+		return
+	}
+
+	addr := fmt.Sprintf("%s:%d", p.Hostname, p.Port)
+	var auth *proxy.Auth
+	if p.Username != "" {
+		auth = &proxy.Auth{User: p.Username, Password: p.Password}
+	}
+
+	dialer, err := proxy.SOCKS5("tcp", addr, auth, proxy.Direct)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": fmt.Sprintf("代理配置错误: %s", err.Error())})
+		return
+	}
+
+	conn, err := dialer.Dial("tcp", "api.telegram.org:443")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": fmt.Sprintf("连接失败: %s", err.Error())})
+		return
+	}
+	defer conn.Close()
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": fmt.Sprintf("代理 %s 可用，已连通 Telegram", addr)})
 }
