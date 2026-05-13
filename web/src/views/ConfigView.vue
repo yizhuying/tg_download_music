@@ -243,23 +243,25 @@ onMounted(() => {
     <div v-if="!showLogin">
       <div class="card">
         <h2>API 凭证</h2>
-        <div class="form-group">
-          <label>API ID <span class="required">*</span></label>
-          <input type="number" v-model.number="apiId"/>
-        </div>
-        <div class="form-group">
-          <label>API Hash <span class="required">*</span></label>
-          <input type="password" v-model="apiHash"/>
-        </div>
-        <div class="form-group">
-          <label>Session 名称</label>
-          <input type="text" v-model="sessionName"/>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label>API ID <span class="required">*</span></label>
+            <input type="number" v-model.number="apiId"/>
+          </div>
+          <div class="form-group">
+            <label>API Hash <span class="required">*</span></label>
+            <input type="password" v-model="apiHash"/>
+          </div>
+          <div class="form-group">
+            <label>Session 名称</label>
+            <input type="text" v-model="sessionName"/>
+          </div>
         </div>
       </div>
 
       <div class="card">
         <h2>代理配置</h2>
-        <div class="form-row">
+        <div class="form-row-3">
           <div class="form-group">
             <label>代理类型</label>
             <select v-model="proxyScheme">
@@ -301,12 +303,12 @@ onMounted(() => {
 
       <div class="card">
         <h2>存储路径</h2>
-        <div class="form-row">
+        <div class="form-row-3">
           <div class="form-group">
             <label>Session 目录</label>
             <input type="text" v-model="sessionDir"/>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="grid-column: span 2">
             <label>下载目录</label>
             <div class="dir-input-group">
               <input type="text" v-model="downloadDir"/>
@@ -320,17 +322,17 @@ onMounted(() => {
         <h2>Telegram 认证</h2>
         <div v-if="authLoading">检查中...</div>
         <div v-else-if="!authLoggedIn">
-          <div class="form-row">
-            <div class="form-group">
+          <div class="form-row-3">
+            <div class="form-group" style="grid-column: span 2">
               <label>手机号</label>
               <input type="text" v-model="authPhone" placeholder="+8613800138000"/>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="align-self: flex-end">
               <button class="btn btn-info" @click="doSendCode">发送验证码</button>
             </div>
           </div>
           <div v-if="showCodeSection">
-            <div class="form-row">
+            <div class="form-row-3">
               <div class="form-group">
                 <label>验证码</label>
                 <input type="text" v-model="authCode" placeholder="SMS 验证码"/>
@@ -340,7 +342,7 @@ onMounted(() => {
               </div>
             </div>
             <div v-if="show2FA">
-              <div class="form-row">
+              <div class="form-row-3">
                 <div class="form-group">
                   <label>两步验证密码</label>
                   <input type="password" v-model="auth2FA" placeholder="2FA 密码"/>
@@ -356,8 +358,8 @@ onMounted(() => {
           <div class="status-bar">
             <span class="badge running">已登录</span>
             <span>{{ authPhone }}</span>
+            <button class="btn btn-danger btn-sm" @click="doLogout">退出登录</button>
           </div>
-          <button class="btn btn-danger btn-sm" @click="doLogout">退出登录</button>
         </div>
       </div>
 
