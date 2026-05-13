@@ -19,8 +19,10 @@ var distFS embed.FS
 func main() {
 	port := flag.Int("port", 8080, "server listen port")
 	configPath := flag.String("config", "config.json", "config file path")
+	downloadDir := flag.String("download-dir", "", "override download directory")
+	sessionDir := flag.String("session-dir", "", "override session directory")
 	socketPath := flag.String("socket", "", "unix socket path for gateway mode")
-	adminPassword := flag.String("admin-password", "", "set admin password (overrides env var)")
+	adminPassword := flag.String("admin-password", "admin", "set admin password (overrides env var)")
 	flag.Parse()
 
 	listenAddr := fmt.Sprintf(":%d", *port)
@@ -29,6 +31,16 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	if *downloadDir != "" {
+		c := cfg.Get()
+		c.DownloadDir = *downloadDir
+		_ = cfg.Save(c)
+	}
+	if *sessionDir != "" {
+		c := cfg.Get()
+		c.SessionDir = *sessionDir
+		_ = cfg.Save(c)
+	}
 	if *adminPassword != "" {
 		os.Setenv("ADMIN_PASSWORD", *adminPassword)
 	}

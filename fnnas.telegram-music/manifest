@@ -1,6 +1,6 @@
 appname               = telegram-music
 version               = 1.0.0
-display_name          = TMusicDownloader
+display_name          = TGMusicD
 desc                  = Telegram 频道音乐下载工具
 arch                  = x86_64
 source                = thirdparty

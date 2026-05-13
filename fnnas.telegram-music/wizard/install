@@ -4,16 +4,16 @@
     "items": [
       {
         "type": "tips",
-        "helpText": "欢迎使用 TMusicDownloader 在开始使用前，请阅读并同意我们的服务条款。"
+        "helpText": "欢迎使用 TGMusicD。本应用通过 Telegram MTProto 协议从指定频道下载音频文件，所有数据存储在本地，不会上传至任何第三方服务器。"
       },
       {
         "type": "tips",
-        "helpText": "请阅读 <a target=\"_blank\" href=\"https://example.com/privacy\">隐私政策</a> 和 <a target=\"_blank\" href=\"https://example.com/terms\">服务条款</a>。"
+        "helpText": "隐私说明：本应用使用 Telegram 官方 API，会话凭证仅保存在本地。应用不会收集、传输或分享任何个人信息。"
       },
       {
         "type": "switch",
         "field": "wizard_agree_terms",
-        "label": "我已阅读并同意服务条款",
+        "label": "我已阅读并同意上述隐私政策与服务条款",
         "rules": [
           {
             "required": true,
@@ -39,6 +39,22 @@
           {
             "pattern": "^[0-9]+$",
             "message": "端口号必须是数字"
+          }
+        ]
+      },
+      {
+        "type": "password",
+        "field": "wizard_app_password",
+        "label": "登录密码",
+        "initValue": "admin",
+        "rules": [
+          {
+            "required": true,
+            "message": "请输入管理密码"
+          },
+          {
+            "minLength": 6,
+            "message": "密码长度至少4位"
           }
         ]
       }
