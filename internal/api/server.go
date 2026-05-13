@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
+	"os"
 	"sync"
 	"telegram-music/internal/config"
 	"telegram-music/internal/download"
@@ -142,4 +144,20 @@ func (s *Server) Run(addr string) error {
 		s.router.StaticFS("/assets", http.FS(assetsFS))
 	}
 	return s.router.Run(addr)
+}
+
+// RunUnix starts the HTTP server on a Unix domain socket.
+func (s *Server) RunUnix(socketPath string) error {
+	_ = os.Remove(socketPath)
+
+	ln, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return err
+	}
+
+	if err := os.Chmod(socketPath, 0777); err != nil {
+		return err
+	}
+
+	return http.Serve(ln, s.router)
 }

@@ -4,9 +4,11 @@
             "title": "Telegram Music",
             "icon": "images/icon_{0}.png",
             "type": "url",
-            "protocol": "http",
-            "port": "8080",
-            "url": "/",
+            "protocol": "",
+            "gatewaySocket": "app.sock",
+            "gatewayPrefix": "/app/telegram-music",
+            "port": "${wizard_app_port}",
+            "url": "/app/telegram-music",
             "allUsers": false
         }
     }

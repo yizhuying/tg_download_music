@@ -35,12 +35,13 @@ echo "应用端口: $APP_PORT"
 SERVER_BIN="${APP_ROOT}/server/telegram-music-server"
 CONFIG_FILE="${APP_ROOT}/config.json"
 SESSION_DIR="${APP_ROOT}/sessions"
+SOCKET_FILE="${APP_ROOT}/app.sock"
 
 # Ensure session directory exists
 mkdir -p "${SESSION_DIR}"
 
 # write the command to start your program here
-CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE}"
+CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE}"
 
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"

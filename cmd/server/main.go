@@ -20,6 +20,7 @@ func main() {
 	port := flag.Int("port", 8080, "server listen port")
 	configPath := flag.String("config", "config.json", "config file path")
 	downloadDir := flag.String("download-dir", "", "override download directory")
+	socketPath := flag.String("socket", "", "unix socket path for gateway mode")
 	flag.Parse()
 
 	listenAddr := fmt.Sprintf(":%d", *port)
@@ -39,6 +40,16 @@ func main() {
 	srv := api.NewServer(cfg, webFS)
 	log.Printf("Starting Telegram Music Manager: http://localhost%s\n", listenAddr)
 
+	if *socketPath != "" {
+		os.Remove(*socketPath)
+		go func() {
+			log.Printf("Listening on unix socket: %s\n", *socketPath)
+			if err := srv.RunUnix(*socketPath); err != nil {
+				log.Fatalf("Unix socket server failed: %v", err)
+			}
+		}()
+	}
+
 	go func() {
 		if err := srv.Run(listenAddr); err != nil {
 			log.Fatalf("Server failed: %v", err)
@@ -49,4 +60,8 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down...")
+
+	if *socketPath != "" {
+		os.Remove(*socketPath)
+	}
 }
