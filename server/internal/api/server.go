@@ -30,10 +30,12 @@ type Server struct {
 	runningCtx      context.Context
 	cancelRunning   context.CancelFunc
 	logger          *zap.Logger
+	version         string
+	buildTime       string
 }
 
 // NewServer creates a new Server with all subcomponents initialized.
-func NewServer(cfg *config.Manager, webFS fs.FS) *Server {
+func NewServer(cfg *config.Manager, webFS fs.FS, version, buildTime string) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
@@ -46,6 +48,8 @@ func NewServer(cfg *config.Manager, webFS fs.FS) *Server {
 		webFS:         webFS,
 		downloadState: dlState,
 		logger:        logger,
+		version:       version,
+		buildTime:     buildTime,
 	}
 
 	s.hub = NewHub(func() interface{} {

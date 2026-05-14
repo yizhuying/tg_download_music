@@ -1,5 +1,3 @@
 #!/bin/bash
 
-### This script is called after the user uninstalls the application.
-
-exit 0
+echo '[{"stepTitle":"卸载确认","items":[{"type":"tips","helpText":"即将卸载 TuneGram，请选择是否同时清除应用数据（包括配置、会话记录和日志）。"},{"type":"switch","field":"wizard_delete_data","label":"清除应用数据（config.json、sessions、日志等）","initValue":false}]}]'

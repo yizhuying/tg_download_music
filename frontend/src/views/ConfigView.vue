@@ -161,17 +161,17 @@ async function doLogout() {
     showCodeSection.value = false
     show2FA.value = false
   } catch (e: any) {
-    showToast(e.response?.data?.error || '退出失败')
+    showError(e.response?.data?.error || '退出失败')
   }
 }
 
 async function doSaveConfig() {
   if (!apiId.value || !apiHash.value) {
-    showToast('API ID 和 API Hash 为必填项')
+    showError('API ID 和 API Hash 为必填项')
     return
   }
   if (proxyScheme.value !== 'none' && (!proxyHostname.value || !proxyPort.value)) {
-    showToast('代理主机和端口为必填项')
+    showError('代理主机和端口为必填项')
     return
   }
   const data = {
@@ -286,10 +286,10 @@ onMounted(() => {
             <el-button type="primary" @click="doSaveConfig">保存配置</el-button>
           </div>
         </div>
-        <div class="form-row-3">
+        <div class="api_cert">
           <div class="form-group">
             <label>API ID <span class="required">*</span></label>
-            <el-input type="number" v-model.number="apiId"/>
+            <el-input type="text" v-model.number="apiId"/>
           </div>
           <div class="form-group">
             <label>API Hash <span class="required">*</span></label>
@@ -312,9 +312,12 @@ onMounted(() => {
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <h2>代理配置</h2>
-          <el-button :loading="proxyLoading" :disabled="proxyLoading" style="background-color:darksalmon;color:#fff" @click="doTestProxy">测试代理</el-button>
+          <el-button :loading="proxyLoading" :disabled="proxyLoading"
+                     style="background-color:#76BCF0FF;color:#fff"
+                     @click="doTestProxy">测试代理
+          </el-button>
         </div>
-        <div class="form-row-6">
+        <div class="proxy_settings">
           <div class="form-group">
             <label>代理类型</label>
             <el-select v-model="proxyScheme" style="width:100%">

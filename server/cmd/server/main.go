@@ -16,6 +16,11 @@ import (
 //go:embed dist/*
 var distFS embed.FS
 
+var (
+	version   = "dev"
+	buildTime = "unknown"
+)
+
 func main() {
 	port := flag.Int("port", 45116, "server listen port")
 	configPath := flag.String("config", "config.json", "config file path")
@@ -50,7 +55,7 @@ func main() {
 
 	webFS, _ := fs.Sub(distFS, "dist")
 
-	srv := api.NewServer(cfg, webFS)
+	srv := api.NewServer(cfg, webFS, version, buildTime)
 
 	// Listen on HTTP port
 	go func() {

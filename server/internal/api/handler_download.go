@@ -12,7 +12,15 @@ import (
 
 func (s *Server) getDownloadStatus(c *gin.Context) {
 	state := s.downloadState.Get()
-	c.JSON(http.StatusOK, state)
+	c.JSON(http.StatusOK, gin.H{
+		"running":          state.Running,
+		"total_downloaded": state.TotalDownloaded,
+		"current_channel":  state.CurrentChannel,
+		"started_at":       state.StartedAt,
+		"logs":             state.Logs,
+		"version":          s.version,
+		"build_time":       s.buildTime,
+	})
 }
 
 func (s *Server) startDownload(c *gin.Context) {

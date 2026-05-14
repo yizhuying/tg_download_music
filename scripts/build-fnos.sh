@@ -26,8 +26,11 @@ npx vite build
 
 # [2] Build Go binary
 echo "[2/3] Building Go binary (linux/amd64)..."
+BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+VERSION=$(cd "${ROOT}" && git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS="-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 cd "${ROOT}/server"
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "${ROOT}/tg-music-server" ./cmd/server/
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o "${ROOT}/tg-music-server" ./cmd/server/
 
 # [3] Build fnOS package
 echo "[3/3] Copying binary to package and building .fpk..."

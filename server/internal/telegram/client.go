@@ -57,8 +57,10 @@ func NewClient(ctx context.Context, cfg AppConfig, logger *zap.Logger) (*Client,
 	}
 
 	// gotd reads proxy from ALL_PROXY / NO_PROXY env vars.
-	// If config specifies a proxy, set the environment variable so OptionsFromEnvironment picks it up.
-	if cfg.Proxy.Hostname != "" && cfg.Proxy.Port != 0 {
+	if cfg.Proxy.Scheme == "none" || cfg.Proxy.Hostname == "" || cfg.Proxy.Port == 0 {
+		_ = os.Unsetenv("ALL_PROXY")
+		_ = os.Unsetenv("all_proxy")
+	} else {
 		addr := fmt.Sprintf("%s:%d", cfg.Proxy.Hostname, cfg.Proxy.Port)
 		scheme := cfg.Proxy.Scheme
 		if scheme == "" {

@@ -25,6 +25,7 @@ body {
 .container::-webkit-scrollbar {
     width: 4px;
 }
+
 .container::-webkit-scrollbar-thumb {
     background: #ccc;
     border-radius: 2px;
@@ -90,15 +91,15 @@ nav a.active, nav a:hover {
     gap: 8px;
 }
 
-.form-row-3 {
+.api_cert {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 10% 30% 12%;
     gap: 8px;
 }
 
-.form-row-6 {
+.proxy_settings {
     display: grid;
-    grid-template-columns: 80px 120px 60px 120px 140px auto;
+    grid-template-columns: 96px 120px 60px 120px 140px auto;
     gap: 10px;
 }
 
@@ -151,18 +152,60 @@ nav a.active, nav a:hover {
     font-weight: 500;
 }
 
-.btn-primary { background: #4a90d9; color: #fff; }
-.btn-primary:hover { background: #357abd; }
-.btn-success { background: #34a853; color: #fff; }
-.btn-success:hover { background: #2d8f47; }
-.btn-danger { background: #ea4335; color: #fff; }
-.btn-danger:hover { background: #c5221f; }
-.btn-secondary { background: #f1f3f4; color: #333; }
-.btn-secondary:hover { background: #e8eaed; }
-.btn-info { background: #17a2b8; color: #fff; }
-.btn-info:hover { background: #138496; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-sm { padding: 2px 6px; font-size: 0.72rem; }
+.btn-primary {
+    background: #4a90d9;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: #357abd;
+}
+
+.btn-success {
+    background: #34a853;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background: #2d8f47;
+}
+
+.btn-danger {
+    background: #ea4335;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: #c5221f;
+}
+
+.btn-secondary {
+    background: #f1f3f4;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #e8eaed;
+}
+
+.btn-info {
+    background: #17a2b8;
+    color: #fff;
+}
+
+.btn-info:hover {
+    background: #138496;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-sm {
+    padding: 2px 6px;
+    font-size: 0.72rem;
+}
 
 .form-actions {
     display: flex;
@@ -185,9 +228,20 @@ nav a.active, nav a:hover {
     font-weight: 500;
 }
 
-.badge-running { background: #e6f4ea; color: #137333; }
-.badge-idle { background: #f1f3f4; color: #666; }
-.badge-done { background: #e6f4ea; color: #137333; }
+.badge-running {
+    background: #e6f4ea;
+    color: #137333;
+}
+
+.badge-idle {
+    background: #f1f3f4;
+    color: #666;
+}
+
+.badge-done {
+    background: #e6f4ea;
+    color: #137333;
+}
 
 .status-details {
     font-size: 0.75rem;
@@ -362,5 +416,7 @@ nav a.active, nav a:hover {
     padding: 8px 0;
 }
 
-nav a { cursor: pointer; }
+nav a {
+    cursor: pointer;
+}
 

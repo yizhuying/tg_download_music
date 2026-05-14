@@ -30,7 +30,7 @@ type Config struct {
 func Defaults() Config {
 	return Config{
 		SessionName: "my_session",
-		Channels:    []string{"VmoMusic", "FLAC_HR", "cjCoolMusic"},
+		Channels:    []string{},
 		Proxy:       Proxy{Scheme: "socks5"},
 		DownloadDir: "./downloads",
 		SessionDir:  "./sessions",
