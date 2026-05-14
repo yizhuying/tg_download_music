@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/net/proxy"
 
-	"telegram-music/internal/config"
+	"tg-music/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,12 +18,12 @@ func (s *Server) getConfig(c *gin.Context) {
 
 func (s *Server) saveConfig(c *gin.Context) {
 	var req struct {
-		APIID       int      `json:"api_id"`
-		APIHash     string   `json:"api_hash"`
-		SessionName string   `json:"session_name"`
-		Channels    []string `json:"channels"`
+		APIID       int          `json:"api_id"`
+		APIHash     string       `json:"api_hash"`
+		SessionName string       `json:"session_name"`
+		Channels    []string     `json:"channels"`
 		Proxy       config.Proxy `json:"proxy"`
-		DownloadDir string   `json:"download_dir"`
+		DownloadDir string       `json:"download_dir"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid data"})

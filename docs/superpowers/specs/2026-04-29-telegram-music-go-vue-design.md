@@ -196,7 +196,7 @@ type ScannedMessage struct {
 ```bash
 make build:
   1. cd web && npm install && npx vite build
-  2. go build -o telegram-music ./cmd/server
+  2. go build -o tg-music ./cmd/server
 
 make dev:
   1. cd web && npm run dev  (Vite dev server, proxy /api → Go)

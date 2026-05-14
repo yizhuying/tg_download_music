@@ -3,7 +3,7 @@
 build: build-frontend build-server
 
 build-server:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local go build -o telegram-music-server ./cmd/server/
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local go build -o tg-music-server ./cmd/server/
 
 build-frontend:
 	cd web && npm install && npx vite build
@@ -13,8 +13,8 @@ dev:
 	@echo "Terminal 2: cd web && npm run dev"
 
 clean:
-	rm -f telegram-music
-	rm -f telegram-music-server
+	rm -f tg-music
+	rm -f tg-music-server
 	rm -rf cmd/server/dist
 
 fnos:

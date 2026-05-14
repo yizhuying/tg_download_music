@@ -9,8 +9,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"telegram-music/internal/api"
-	"telegram-music/internal/config"
+	"tg-music/internal/api"
+	"tg-music/internal/config"
 )
 
 //go:embed dist/*

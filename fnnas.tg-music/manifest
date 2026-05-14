@@ -1,4 +1,4 @@
-appname               = telegram-music
+appname               = tg-music
 version               = 1.0.0
 display_name          = TGMusicD
 desc                  = Telegram 频道音乐下载工具
@@ -7,4 +7,4 @@ source                = thirdparty
 maintainer            = yizhuying
 distributor           = yizhuying
 desktop_uidir         = ui
-desktop_applaunchname = telegram-music.Application
+desktop_applaunchname = tg-music.Application

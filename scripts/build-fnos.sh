@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PKG_DIR="${ROOT}/fnnas.telegram-music"
+PKG_DIR="${ROOT}/fnnas.tg-music"
 APP_SERVER_DIR="${PKG_DIR}/app/server"
 
 # Locate fnpack
@@ -26,17 +26,17 @@ npx vite build
 # [2] Build Go binary
 echo "[2/3] Building Go binary (linux/amd64)..."
 cd "${ROOT}"
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o telegram-music-server ./cmd/server/
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o tg-music-server ./cmd/server/
 
 # [3] Build fnOS package
 echo "[3/3] Copying binary to package and building .fpk..."
 mkdir -p "${APP_SERVER_DIR}"
-cp "${ROOT}/telegram-music-server" "${APP_SERVER_DIR}/"
+cp "${ROOT}/tg-music-server" "${APP_SERVER_DIR}/"
 cd "${PKG_DIR}"
 ${FNPACK} build
-mv -f "${PKG_DIR}/telegram-music.fpk" "${ROOT}/telegram-music.fpk"
+mv -f "${PKG_DIR}/tg-music.fpk" "${ROOT}/tg-music.fpk"
 
 echo ""
 echo "=== Build complete ==="
-echo "Package: ${ROOT}/telegram-music.fpk"
-ls -lh "${ROOT}/telegram-music.fpk"
+echo "Package: ${ROOT}/tg-music.fpk"
+ls -lh "${ROOT}/tg-music.fpk"

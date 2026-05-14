@@ -408,6 +408,7 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 
 		mm, ok := history.(*tg.MessagesMessages)
 		if !ok || len(mm.Messages) == 0 {
+			m.state.AddLog("没有更多消息")
 			break
 		}
 
@@ -565,7 +566,7 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 				downloaded := humanReadableSize(current) + "/" + humanReadableSize(total)
 				m.hub.Broadcast("log", map[string]string{
 					"time":    "now",
-					"message": fmt.Sprintf("📥 %s (%.0f%%)", downloaded, pct),
+					"message": fmt.Sprintf(" %s (%.0f%%)", downloaded, pct),
 				})
 			}
 		},

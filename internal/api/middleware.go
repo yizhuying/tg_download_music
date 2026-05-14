@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 	"os"
-	"telegram-music/internal/config"
+	"tg-music/internal/config"
 
 	"github.com/gin-gonic/gin"
 )

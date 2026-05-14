@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"telegram-music/internal/telegram"
+	"tg-music/internal/telegram"
 
 	"github.com/gin-gonic/gin"
 )

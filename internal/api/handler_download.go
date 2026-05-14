@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"telegram-music/internal/reponse"
+	"tg-music/internal/reponse"
 
 	"github.com/gin-gonic/gin"
 )

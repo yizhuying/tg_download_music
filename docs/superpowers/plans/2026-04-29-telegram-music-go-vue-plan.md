@@ -19,7 +19,7 @@
 - [ ] **Step 1: Initialize Go module and create config**
 
 ```bash
-go mod init telegram-music
+go mod init tg-music
 ```
 
 Create `internal/config/config.go`:
@@ -127,7 +127,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
-	"telegram-music/internal/config"
+	"tg-music/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -189,7 +189,7 @@ package api
 
 import (
 	"net/http"
-	"telegram-music/internal/config"
+	"tg-music/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -243,7 +243,7 @@ package api
 
 import (
 	"net/http"
-	"telegram-music/internal/config"
+	"tg-music/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -278,8 +278,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"telegram-music/internal/api"
-	"telegram-music/internal/config"
+	"tg-music/internal/api"
+	"tg-music/internal/config"
 )
 
 func main() {
@@ -1400,7 +1400,7 @@ import (
 	"context"
 	"net/http"
 	"sync"
-	"telegram-music/internal/config"
+	"tg-music/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -1499,9 +1499,9 @@ import (
 	"io/fs"
 	"net/http"
 	"sync"
-	"telegram-music/internal/config"
-	"telegram-music/internal/download"
-	"telegram-music/internal/telegram"
+	"tg-music/internal/config"
+	"tg-music/internal/download"
+	"tg-music/internal/telegram"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -1650,7 +1650,7 @@ package api
 import (
 	"net/http"
 	"os"
-	"telegram-music/internal/config"
+	"tg-music/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -1718,7 +1718,7 @@ Create `web/package.json` (if not created by npm):
 
 ```json
 {
-  "name": "telegram-music-web",
+  "name": "tg-music-web",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -2993,13 +2993,13 @@ Create `Makefile`:
 
 build:
 	cd web && npm install && npx vite build
-	go build -o telegram-music ./cmd/server/
+	go build -o tg-music ./cmd/server/
 
 dev:
 	@echo "Start Go server on :8080 first, then run: cd web && npm run dev"
 
 clean:
-	rm -rf telegram-music web/dist
+	rm -rf tg-music web/dist
 ```
 
 - [ ] **Step 2: Update .gitignore**
@@ -3009,7 +3009,7 @@ Create `.gitignore`:
 ```
 # Go
 *.exe
-telegram-music
+tg-music
 sessions/
 downloads/
 config.json
@@ -3031,7 +3031,7 @@ web/dist/
 
 ```bash
 make build
-./telegram-music
+./tg-music
 ```
 
 Expected: server starts, prints "Starting Telegram Music Manager: http://localhost:8080", serves the Vue SPA at `http://localhost:8080`.
