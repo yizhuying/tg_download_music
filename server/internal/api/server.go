@@ -113,7 +113,7 @@ func (s *Server) registerRoutes() {
 	s.router.GET("/api/ws", s.hub.HandleWS)
 
 	api := s.router.Group("/api")
-	api.Use(authMiddleware(s.config))
+	api.Use(authMiddleware())
 
 	api.GET("/config", s.getConfig)
 	api.POST("/config", s.saveConfig)

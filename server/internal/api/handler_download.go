@@ -2,10 +2,10 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
-	"tg-music/internal/reponse"
 
 	"github.com/gin-gonic/gin"
 )
@@ -118,14 +118,25 @@ func (s *Server) quickTest(c *gin.Context) {
 }
 
 func (s *Server) listDirs(c *gin.Context) {
-	// Log fnOS accessible paths for debugging
-	fnOsENVDirs := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
-	fnOsENVDirsArray := strings.Split(fnOsENVDirs, ":")
-
-	if fnOsENVDirs != "" {
-		reponse.Success(c, fnOsENVDirsArray)
-	} else {
-		reponse.Error(c, "请检查是否配置，并重启服务")
+	paths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
+	s.logger.Info(fmt.Sprintf("Accessible paths from environment: %s", paths))
+	if paths == "" {
+		cfg := s.config.Get()
+		if cfg.DownloadDir != "" {
+			paths = cfg.DownloadDir
+		} else {
+			c.JSON(http.StatusOK, []string{})
+			return
+		}
 	}
 
+	var result []string
+	for _, p := range strings.Split(paths, ":") {
+		if p == "" {
+			continue
+		}
+		result = append(result, p)
+	}
+
+	c.JSON(http.StatusOK, result)
 }

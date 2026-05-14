@@ -27,8 +27,12 @@ func main() {
 	downloadDir := flag.String("download-dir", "", "override download directory")
 	sessionDir := flag.String("session-dir", "", "override session directory")
 	socketPath := flag.String("socket", "", "unix socket path for gateway mode")
-	adminPassword := flag.String("admin-password", "admin", "set admin password (overrides env var)")
+	adminPassword := flag.String("admin-password", "", "set admin password")
 	flag.Parse()
+
+	if *adminPassword != "" {
+		_ = os.Setenv("ADMIN_PASSWORD", *adminPassword)
+	}
 
 	listenAddr := fmt.Sprintf(":%d", *port)
 	cfg, err := config.NewManager(*configPath)
@@ -45,12 +49,6 @@ func main() {
 		c := cfg.Get()
 		c.SessionDir = *sessionDir
 		_ = cfg.Save(c)
-	}
-	if *adminPassword != "" {
-		err := os.Setenv("ADMIN_PASSWORD", *adminPassword)
-		if err != nil {
-			return
-		}
 	}
 
 	webFS, _ := fs.Sub(distFS, "dist")

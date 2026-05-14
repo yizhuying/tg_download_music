@@ -3,7 +3,6 @@ package api
 import (
 	"net/http"
 	"os"
-	"tg-music/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,13 +20,14 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func authMiddleware(cfg *config.Manager) gin.HandlerFunc {
+func authMiddleware() gin.HandlerFunc {
 	expected := os.Getenv("ADMIN_PASSWORD")
-	if expected == "" {
-		expected = "admin"
-	}
 
 	return func(c *gin.Context) {
+		if expected == "" {
+			c.Next()
+			return
+		}
 		pwd := c.GetHeader("X-Admin-Password")
 		if pwd == "" || pwd != expected {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})

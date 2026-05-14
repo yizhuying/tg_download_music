@@ -55,8 +55,14 @@ func (s *Server) saveConfig(c *gin.Context) {
 }
 
 func (s *Server) testProxy(c *gin.Context) {
-	cfg := s.config.Get()
-	p := cfg.Proxy
+	var req struct {
+		Proxy config.Proxy `json:"proxy"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		p := s.config.Get().Proxy
+		req.Proxy = p
+	}
+	p := req.Proxy
 	if p.Scheme == "none" || p.Hostname == "" || p.Port == 0 {
 		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "代理未配置"})
 		return

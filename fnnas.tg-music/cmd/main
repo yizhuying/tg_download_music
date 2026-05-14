@@ -9,8 +9,8 @@ if [ -z "${APP_PORT}" ]; then
 fi
 
 APP_PASSWORD="${wizard_app_password}"
-if [ -z "${APP_PASSWORD}" ]; then
-    APP_PASSWORD="admin"
+if [ -n "${APP_PASSWORD}" ]; then
+    export ADMIN_PASSWORD="${APP_PASSWORD}"
 fi
 
 # Export fnOS data paths for the Go process
@@ -29,12 +29,11 @@ log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
 }
 
-log_msg "=== Starting tg-music ==="
+log_msg "=== Starting TuneGram ==="
 log_msg "TRIM_PKGVAR='${TRIM_PKGVAR:-}'"
 log_msg "TRIM_APPDEST='${TRIM_APPDEST:-}'"
 log_msg "TRIM_DATA_ACCESSIBLE_PATHS='${TRIM_DATA_ACCESSIBLE_PATHS:-}'"
 log_msg "APP_PORT='${APP_PORT}'"
-log_msg "APP_PASSWORD='******'"
 log_msg "SERVER_BIN='${SERVER_BIN}'"
 log_msg "CONFIG_FILE='${CONFIG_FILE}'"
 log_msg "SESSION_DIR='${SESSION_DIR}'"
@@ -47,7 +46,7 @@ if [ ! -x "${SERVER_BIN}" ]; then
 fi
 
 # write the command to start your program here
-CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE} -session-dir ${SESSION_DIR} -admin-password ${APP_PASSWORD}"
+CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE} -session-dir ${SESSION_DIR}"
 
 log_msg "CMD=${CMD}"
 

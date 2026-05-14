@@ -1,21 +1,6 @@
 #!/bin/bash
 
-LOG_FILE="${TRIM_PKGVAR}/info.log"
-
-log_msg() {
-	echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}" 2>/dev/null || true
-}
-
-if [ "${wizard_delete_data}" = "true" ]; then
-	log_msg "用户选择清除数据，正在删除 ${TRIM_PKGVAR} ..."
-	rm -rf "${TRIM_PKGVAR:?}/config.json"
-	rm -rf "${TRIM_PKGVAR:?}/sessions"
-	rm -rf "${TRIM_PKGVAR:?}/app.sock"
-	rm -rf "${TRIM_PKGVAR:?}/app.pid"
-	rm -rf "${TRIM_PKGVAR:?}/info.log"
-	log_msg "数据清除完成"
-else
-	log_msg "用户选择保留数据，跳过清理"
-fi
+# 卸载时不删除 TRIM_PKGVAR 下的数据（config/sessions/logs）
+# 重装应用后可自动恢复
 
 exit 0

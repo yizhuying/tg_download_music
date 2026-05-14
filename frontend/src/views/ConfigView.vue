@@ -282,9 +282,7 @@ onMounted(() => {
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <h2>API 凭证</h2>
-          <div class="form-actions">
-            <el-button type="primary" @click="doSaveConfig">保存配置</el-button>
-          </div>
+          <el-button type="primary" @click="doSaveConfig">保存配置</el-button>
         </div>
         <div class="api_cert">
           <div class="form-group">

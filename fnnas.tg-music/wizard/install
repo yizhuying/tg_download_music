@@ -45,16 +45,12 @@
       {
         "type": "password",
         "field": "wizard_app_password",
-        "label": "登录密码",
+        "label": "管理密码",
         "initValue": "admin",
         "rules": [
           {
             "required": true,
             "message": "请输入管理密码"
-          },
-          {
-            "minLength": 6,
-            "message": "密码长度至少4位"
           }
         ]
       }
