@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG_DIR="${ROOT}/fnnas.tg-music"
 APP_SERVER_DIR="${PKG_DIR}/app/server"
+package_name="TuneGram"
 
 # Locate fnpack
 FNPACK="${ROOT}/fnpack-1.2.1-darwin-arm64"
@@ -34,9 +35,9 @@ mkdir -p "${APP_SERVER_DIR}"
 cp "${ROOT}/tg-music-server" "${APP_SERVER_DIR}/"
 cd "${PKG_DIR}"
 ${FNPACK} build
-mv -f "${PKG_DIR}/tg-music.fpk" "${ROOT}/tg-music.fpk"
+mv -f "${PKG_DIR}/${package_name}.fpk" "${ROOT}/${package_name}.fpk"
 
 echo ""
 echo "=== Build complete ==="
-echo "Package: ${ROOT}/tg-music.fpk"
-ls -lh "${ROOT}/tg-music.fpk"
+echo "Package: ${ROOT}/${package_name}.fpk"
+ls -lh "${ROOT}/${package_name}.fpk"

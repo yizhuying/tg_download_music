@@ -4,7 +4,7 @@
     "items": [
       {
         "type": "tips",
-        "helpText": "欢迎使用 TGMusicD。本应用通过 Telegram MTProto 协议从指定频道下载音频文件，所有数据存储在本地，不会上传至任何第三方服务器。"
+        "helpText": "欢迎使用 TuneGram。本应用通过 Telegram MTProto 协议从指定频道下载音频文件，所有数据存储在本地，不会上传至任何第三方服务器。"
       },
       {
         "type": "tips",

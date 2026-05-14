@@ -386,7 +386,8 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 	}
 
 	count := 0
-	maxID := 0
+	offsetID := 0
+	page := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -394,13 +395,11 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 		default:
 		}
 
+		page++
 		history, err := m.client.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
-			Peer:       peer,
-			MaxID:      maxID,
-			Limit:      100,
-			OffsetDate: 0,
-			OffsetID:   0,
-			AddOffset:  0,
+			Peer:     peer,
+			OffsetID: offsetID,
+			Limit:    100,
 		})
 		if err != nil {
 			return count, err
@@ -415,8 +414,8 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 		case *tg.MessagesChannelMessages:
 			messagesList = v.Messages
 		default:
-			m.state.AddLog("没有更多消息")
-			break
+			m.state.AddLog(fmt.Sprintf("未知消息类型 %T，停止分页", history))
+			return count, nil
 		}
 
 		if len(messagesList) == 0 {
@@ -424,30 +423,29 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 			break
 		}
 
+		m.state.AddLog(fmt.Sprintf("第 %d 页，获取到 %d 条消息", page, len(messagesList)))
+
 		for _, msg := range messagesList {
+			offsetID = msg.GetID()
 			msgMsg, doc, ok := extractAudio(msg)
 			if !ok || !isAudio(doc) {
-				maxID = msg.GetID()
 				continue
 			}
 			saveName := fmt.Sprintf("%d_%s", msgMsg.ID, sanitizeFilename(docFileName(doc)))
 			savePath := filepath.Join(dirPath, saveName)
 			if fileExists(savePath) {
 				m.state.AddLog(fmt.Sprintf("文件已存在，跳过: %s", filepath.Base(savePath)))
-				maxID = msg.GetID()
 				continue
 			}
 
 			m.state.AddLog(fmt.Sprintf("正在下载: %s", filepath.Base(savePath)))
 			if err := m.downloadDocument(ctx, doc, savePath); err != nil {
 				m.state.AddLog(fmt.Sprintf("下载失败: %v", err))
-				maxID = msg.GetID()
 				continue
 			}
 			m.state.AddLog("下载完成")
 			m.state.IncrementDownloaded()
 			count++
-			maxID = msg.GetID()
 		}
 
 		if len(messagesList) < 100 {
@@ -470,13 +468,13 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 	}
 
 	var messages []ScannedMessage
-	maxID := 0
+	offsetID := 0
 
 	for {
 		history, err := m.client.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
-			Peer:  peer,
-			MaxID: maxID,
-			Limit: 100,
+			Peer:     peer,
+			OffsetID: offsetID,
+			Limit:    100,
 		})
 		if err != nil {
 			return messages, err
@@ -491,7 +489,7 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 		case *tg.MessagesChannelMessages:
 			messagesList = v.Messages
 		default:
-			break
+			return messages, nil
 		}
 
 		if len(messagesList) == 0 {
@@ -499,9 +497,9 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 		}
 
 		for _, msg := range messagesList {
+			offsetID = msg.GetID()
 			msgMsg, doc, ok := extractAudio(msg)
 			if !ok || !isAudio(doc) {
-				maxID = msg.GetID()
 				continue
 			}
 			fileName := sanitizeFilename(docFileName(doc))
@@ -514,7 +512,6 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 				FileSize:     doc.Size,
 				Exists:       fileExists(savePath),
 			})
-			maxID = msg.GetID()
 		}
 
 		if len(messagesList) < 100 {

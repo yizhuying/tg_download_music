@@ -1,10 +1,10 @@
-appname               = tg-music
+appname               = TuneGram
 version               = 1.0.0
-display_name          = TGMusicD
+display_name          = TuneGram
 desc                  = Telegram 频道音乐下载工具
 arch                  = x86_64
 source                = thirdparty
 maintainer            = yizhuying
 distributor           = yizhuying
 desktop_uidir         = ui
-desktop_applaunchname = tg-music.Application
+desktop_applaunchname = TuneGram.Application
