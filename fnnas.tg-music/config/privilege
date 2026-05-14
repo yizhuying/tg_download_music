@@ -3,6 +3,6 @@
     {
         "run-as": "package"
     },
-    "username": "telegram_music_downloads",
-    "groupname": "telegram_music_downloads"
+    "username": "tg-music",
+    "groupname": "tg-music"
 }

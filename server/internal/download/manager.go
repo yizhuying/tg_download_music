@@ -406,13 +406,25 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 			return count, err
 		}
 
-		mm, ok := history.(*tg.MessagesMessages)
-		if !ok || len(mm.Messages) == 0 {
+		var messagesList []tg.MessageClass
+		switch v := history.(type) {
+		case *tg.MessagesMessages:
+			messagesList = v.Messages
+		case *tg.MessagesMessagesSlice:
+			messagesList = v.Messages
+		case *tg.MessagesChannelMessages:
+			messagesList = v.Messages
+		default:
 			m.state.AddLog("没有更多消息")
 			break
 		}
 
-		for _, msg := range mm.Messages {
+		if len(messagesList) == 0 {
+			m.state.AddLog("没有更多消息")
+			break
+		}
+
+		for _, msg := range messagesList {
 			msgMsg, doc, ok := extractAudio(msg)
 			if !ok || !isAudio(doc) {
 				maxID = msg.GetID()
@@ -438,7 +450,7 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 			maxID = msg.GetID()
 		}
 
-		if len(mm.Messages) < 100 {
+		if len(messagesList) < 100 {
 			break
 		}
 	}
@@ -470,12 +482,23 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 			return messages, err
 		}
 
-		mm, ok := history.(*tg.MessagesMessages)
-		if !ok || len(mm.Messages) == 0 {
+		var messagesList []tg.MessageClass
+		switch v := history.(type) {
+		case *tg.MessagesMessages:
+			messagesList = v.Messages
+		case *tg.MessagesMessagesSlice:
+			messagesList = v.Messages
+		case *tg.MessagesChannelMessages:
+			messagesList = v.Messages
+		default:
 			break
 		}
 
-		for _, msg := range mm.Messages {
+		if len(messagesList) == 0 {
+			break
+		}
+
+		for _, msg := range messagesList {
 			msgMsg, doc, ok := extractAudio(msg)
 			if !ok || !isAudio(doc) {
 				maxID = msg.GetID()
@@ -494,7 +517,7 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 			maxID = msg.GetID()
 		}
 
-		if len(mm.Messages) < 100 {
+		if len(messagesList) < 100 {
 			break
 		}
 	}
@@ -565,7 +588,7 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 				pct := float64(current) / float64(total) * 100
 				downloaded := humanReadableSize(current) + "/" + humanReadableSize(total)
 				m.hub.Broadcast("log", map[string]string{
-					"time":    "now",
+					"time":    time.Now().Format("15:04:05"),
 					"message": fmt.Sprintf(" %s (%.0f%%)", downloaded, pct),
 				})
 			}

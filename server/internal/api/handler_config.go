@@ -2,8 +2,10 @@ package api
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 
+	"go.uber.org/zap"
 	"golang.org/x/net/proxy"
 
 	"tg-music/internal/config"
@@ -77,7 +79,12 @@ func (s *Server) testProxy(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": false, "message": fmt.Sprintf("连接失败: %s", err.Error())})
 		return
 	}
-	defer conn.Close()
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			s.logger.Warn("关闭连接失败", zap.Error(err))
+		}
+	}(conn)
 
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": fmt.Sprintf("代理 %s 可用，已连通 Telegram", addr)})
 }

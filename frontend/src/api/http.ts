@@ -10,7 +10,8 @@ export function setAdminPassword(pwd: string) {
 }
 
 export function getAdminPassword(): string {
-    return http.defaults.headers.common['X-Admin-Password'] || ''
+    const pwd = http.defaults.headers.common['X-Admin-Password']
+    return typeof pwd === 'string' ? pwd : ''
 }
 
 export function clearAdminPassword() {

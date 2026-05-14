@@ -84,8 +84,14 @@ func isWritable(path string) bool {
 	if err != nil {
 		return false
 	}
-	f.Close()
-	os.Remove(f.Name())
+	err = f.Close()
+	if err != nil {
+		return false
+	}
+	err = os.Remove(f.Name())
+	if err != nil {
+		return false
+	}
 	return true
 }
 

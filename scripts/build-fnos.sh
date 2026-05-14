@@ -19,14 +19,14 @@ echo "=== Building Telegram Music for fnOS ==="
 
 # [1] Build frontend
 echo "[1/3] Building frontend..."
-cd "${ROOT}/web"
+cd "${ROOT}/frontend"
 npm install
 npx vite build
 
 # [2] Build Go binary
 echo "[2/3] Building Go binary (linux/amd64)..."
-cd "${ROOT}"
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o tg-music-server ./cmd/server/
+cd "${ROOT}/server"
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "${ROOT}/tg-music-server" ./cmd/server/
 
 # [3] Build fnOS package
 echo "[3/3] Copying binary to package and building .fpk..."

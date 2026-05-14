@@ -30,7 +30,7 @@
         "type": "text",
         "field": "wizard_app_port",
         "label": "应用端口",
-        "initValue": "8080",
+        "initValue": "45116",
         "rules": [
           {
             "required": true,

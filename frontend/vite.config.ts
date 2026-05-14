@@ -6,13 +6,13 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:45116',
         ws: true,
       },
     },
   },
   build: {
-    outDir: '../cmd/server/dist',
+    outDir: '../server/cmd/server/dist',
     assetsDir: 'assets',
   },
 })

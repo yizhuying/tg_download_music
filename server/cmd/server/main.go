@@ -17,7 +17,7 @@ import (
 var distFS embed.FS
 
 func main() {
-	port := flag.Int("port", 8080, "server listen port")
+	port := flag.Int("port", 45116, "server listen port")
 	configPath := flag.String("config", "config.json", "config file path")
 	downloadDir := flag.String("download-dir", "", "override download directory")
 	sessionDir := flag.String("session-dir", "", "override session directory")
@@ -42,7 +42,10 @@ func main() {
 		_ = cfg.Save(c)
 	}
 	if *adminPassword != "" {
-		os.Setenv("ADMIN_PASSWORD", *adminPassword)
+		err := os.Setenv("ADMIN_PASSWORD", *adminPassword)
+		if err != nil {
+			return
+		}
 	}
 
 	webFS, _ := fs.Sub(distFS, "dist")
@@ -59,7 +62,7 @@ func main() {
 
 	// Also listen on Unix socket if specified (for gateway mode)
 	if *socketPath != "" {
-		os.Remove(*socketPath)
+		_ = os.Remove(*socketPath)
 		log.Printf("Also listening on unix socket: %s\n", *socketPath)
 		go func() {
 			if err := srv.RunUnix(*socketPath); err != nil {

@@ -1,27 +1,11 @@
 #!/bin/bash
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PKG_ROOT="$(dirname "${SCRIPT_DIR}")"
+LOG_FILE="${TRIM_PKGVAR}/info.log"
+PID_FILE="${TRIM_PKGVAR}/app.pid"
 
-# fnOS runtime dir is /var/apps/<name>, symlink target points to actual install dir
-if [ -L "${PKG_ROOT}/target" ]; then
-    APP_ROOT="$(readlink -f "${PKG_ROOT}/target")"
-else
-    APP_ROOT="${PKG_ROOT}"
-fi
-
-# Fallback log/pid paths if TRIM_PKGVAR is empty
-if [ -n "${TRIM_PKGVAR:-}" ]; then
-    LOG_FILE="${TRIM_PKGVAR}/info.log"
-    PID_FILE="${TRIM_PKGVAR}/app.pid"
-else
-    LOG_FILE="${APP_ROOT}/var/info.log"
-    PID_FILE="${APP_ROOT}/var/app.pid"
-    mkdir -p "${APP_ROOT}/var"
-fi
 APP_PORT="${wizard_app_port}"
 if [ -z "${APP_PORT}" ]; then
-    APP_PORT="8080"
+    APP_PORT="45116"
 fi
 
 APP_PASSWORD="${wizard_app_password}"
@@ -29,37 +13,43 @@ if [ -z "${APP_PASSWORD}" ]; then
     APP_PASSWORD="admin"
 fi
 
-# Debug
-echo "TRIM_PKGVAR='${TRIM_PKGVAR:-}'" >> "${LOG_FILE}" 2>/dev/null || true
-echo "APP_ROOT='${APP_ROOT}'" >> "${LOG_FILE}" 2>/dev/null || true
-echo "APP_PORT='${APP_PORT}'" >> "${LOG_FILE}" 2>/dev/null || true
-echo "APP_PASSWORD='******'" >> "${LOG_FILE}" 2>/dev/null || true
-
 # Export fnOS data paths for the Go process
 if [ -n "${TRIM_DATA_ACCESSIBLE_PATHS:-}" ]; then
     export TRIM_DATA_ACCESSIBLE_PATHS
 fi
 
-echo "应用端口: $APP_PORT"
+SESSION_DIR="${TRIM_PKGVAR}/sessions"
+CONFIG_FILE="${TRIM_PKGVAR}/config.json"
+SOCKET_FILE="${TRIM_PKGVAR}/app.sock"
+SERVER_BIN="${TRIM_APPDEST}/server/tg-music-server"
 
-# Construct paths relative to actual install directory
-SERVER_BIN="${APP_ROOT}/server/tg-music-server"
-CONFIG_FILE="${APP_ROOT}/config.json"
-SOCKET_FILE="${APP_ROOT}/app.sock"
-
-# Data directory (writable by app user: /vol1/@appdata/<appname>)
-APP_DATA="${PKG_ROOT}/var"
-SESSION_DIR="${APP_DATA}/sessions"
-
-# Ensure session directory exists
 mkdir -p "${SESSION_DIR}"
-
-# write the command to start your program here
-CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE} -session-dir ${SESSION_DIR} -admin-password ${APP_PASSWORD}"
 
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
 }
+
+log_msg "=== Starting tg-music ==="
+log_msg "TRIM_PKGVAR='${TRIM_PKGVAR:-}'"
+log_msg "TRIM_APPDEST='${TRIM_APPDEST:-}'"
+log_msg "TRIM_DATA_ACCESSIBLE_PATHS='${TRIM_DATA_ACCESSIBLE_PATHS:-}'"
+log_msg "APP_PORT='${APP_PORT}'"
+log_msg "APP_PASSWORD='******'"
+log_msg "SERVER_BIN='${SERVER_BIN}'"
+log_msg "CONFIG_FILE='${CONFIG_FILE}'"
+log_msg "SESSION_DIR='${SESSION_DIR}'"
+log_msg "SOCKET_FILE='${SOCKET_FILE}'"
+
+# Check binary exists
+if [ ! -x "${SERVER_BIN}" ]; then
+    log_msg "ERROR: binary not found or not executable: ${SERVER_BIN}"
+    exit 1
+fi
+
+# write the command to start your program here
+CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE} -session-dir ${SESSION_DIR} -admin-password ${APP_PASSWORD}"
+
+log_msg "CMD=${CMD}"
 
 start_process() {
     if status; then
@@ -69,6 +59,7 @@ start_process() {
     log_msg "Starting process ..."
     bash -c "${CMD}" >> "${LOG_FILE}" 2>&1 &
     printf "%s" "$!" > "${PID_FILE}"
+    log_msg "pid=$!"
     return 0
 }
 
@@ -86,7 +77,7 @@ stop_process() {
         fi
 
         log_msg "send TERM signal to PID:${pid}..."
-        kill -TERM ${pid} >> "${LOG_FILE}" 2>&1
+        kill -TERM "${pid}" >> "${LOG_FILE}" 2>&1
 
         local count=0
         while check_process "${pid}" && [ $count -lt 10 ]; do
