@@ -27,34 +27,30 @@ type Broadcaster interface {
 	Broadcast(typ string, data interface{})
 }
 
+// ConfigProvider provides dynamic access to channel configuration.
+type ConfigProvider interface {
+	GetChannels() ([]string, string)
+	ConfigDir() string
+}
+
 // Manager orchestrates channel scanning and audio downloading.
 type Manager struct {
 	state  *DownloadState
 	client TelegramAPI
 	hub    Broadcaster
+	config ConfigProvider
 	mu     sync.Mutex
 	cancel context.CancelFunc
 }
 
 // NewManager creates a new Manager.
-func NewManager(client TelegramAPI, state *DownloadState, hub Broadcaster) *Manager {
-	return &Manager{client: client, state: state, hub: hub}
+func NewManager(client TelegramAPI, state *DownloadState, hub Broadcaster, config ConfigProvider) *Manager {
+	return &Manager{client: client, state: state, hub: hub, config: config}
 }
 
 func sanitizeFilename(name string) string {
 	re := regexp.MustCompile(`[\\/*?:"<>|]`)
 	return re.ReplaceAllString(name, "_")
-}
-
-func humanReadableSize(size int64) string {
-	units := []string{"B", "KB", "MB", "GB", "TB"}
-	s := float64(size)
-	i := 0
-	for s >= 1024 && i < len(units)-1 {
-		s /= 1024
-		i++
-	}
-	return fmt.Sprintf("%.1f%s", s, units[i])
 }
 
 func fileExists(path string) bool {
@@ -150,7 +146,7 @@ func (m *Manager) resolveChannelInput(ctx context.Context, channel string) (*tg.
 }
 
 // Start begins a batch download of all configured channels.
-func (m *Manager) Start(ctx context.Context, channels []string, downloadDir string) error {
+func (m *Manager) Start(ctx context.Context) error {
 	m.mu.Lock()
 	if m.cancel != nil {
 		m.mu.Unlock()
@@ -177,7 +173,8 @@ func (m *Manager) Start(ctx context.Context, channels []string, downloadDir stri
 			return
 		}
 
-		for _, ch := range channels {
+		processed := make(map[string]bool)
+		for {
 			select {
 			case <-ctx.Done():
 				m.state.AddLog("下载任务已手动停止")
@@ -185,15 +182,30 @@ func (m *Manager) Start(ctx context.Context, channels []string, downloadDir stri
 			default:
 			}
 
-			m.state.SetRunning(true, ch)
-			m.state.AddLog(fmt.Sprintf("开始处理频道: %s", ch))
+			channels, downloadDir := m.config.GetChannels()
 
-			count, err := m.downloadChannel(ctx, ch, downloadDir)
+			var next string
+			for _, ch := range channels {
+				if !processed[ch] {
+					next = ch
+					break
+				}
+			}
+
+			if next == "" {
+				break
+			}
+
+			processed[next] = true
+			m.state.SetRunning(true, next)
+			m.state.AddLog(fmt.Sprintf("开始处理频道: %s", next))
+
+			count, err := m.downloadChannel(ctx, next, downloadDir)
 			if err != nil {
-				m.state.AddLog(fmt.Sprintf("频道 %s 下载失败: %v", ch, err))
+				m.state.AddLog(fmt.Sprintf("频道 %s 下载失败: %v", next, err))
 				continue
 			}
-			m.state.AddLog(fmt.Sprintf("频道 %s 下载完毕，共下载 %d 个文件", ch, count))
+			m.state.AddLog(fmt.Sprintf("频道 %s 下载完毕，共下载 %d 个文件", next, count))
 		}
 
 		m.state.AddLog(fmt.Sprintf("全部完成，共下载 %d 个文件", m.state.Get().TotalDownloaded))
@@ -566,48 +578,11 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 		FileReference: doc.FileReference,
 	}
 
-	var mu sync.Mutex
-	var lastReported int64
 	file, err := os.Create(savePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	progressWriter := &progressWriterAt{
-		w:     file,
-		total: doc.Size,
-		report: func(current, total int64) {
-			mu.Lock()
-			defer mu.Unlock()
-			if current-lastReported >= doc.Size/10 || current == total {
-				lastReported = current
-				pct := float64(current) / float64(total) * 100
-				downloaded := humanReadableSize(current) + "/" + humanReadableSize(total)
-				m.hub.Broadcast("log", map[string]string{
-					"time":    time.Now().Format("15:04:05"),
-					"message": fmt.Sprintf(" %s (%.0f%%)", downloaded, pct),
-				})
-			}
-		},
-	}
-
-	return m.client.DownloadToFile(ctx, location, "", progressWriter)
-}
-
-// progressWriterAt wraps an io.WriterAt and reports progress.
-type progressWriterAt struct {
-	w       io.WriterAt
-	total   int64
-	written int64
-	report  func(current, total int64)
-}
-
-func (w *progressWriterAt) WriteAt(p []byte, off int64) (int, error) {
-	n, err := w.w.WriteAt(p, off)
-	w.written += int64(n)
-	if w.report != nil {
-		w.report(w.written, w.total)
-	}
-	return n, err
+	return m.client.DownloadToFile(ctx, location, "", file)
 }

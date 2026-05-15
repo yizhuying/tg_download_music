@@ -1,5 +1,7 @@
 #!/bin/bash
 
-### This script is called after the user change environment variables in application setting page.
+# Called after user changes app settings in fnOS
+# Update accessible paths file for Go process to read dynamically
+echo "${TRIM_DATA_ACCESSIBLE_PATHS:-}" > "${TRIM_PKGVAR}/accessible_paths"
 
 exit 0

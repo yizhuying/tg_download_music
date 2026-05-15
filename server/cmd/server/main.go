@@ -66,7 +66,7 @@ func main() {
 	// Also listen on Unix socket if specified (for gateway mode)
 	if *socketPath != "" {
 		_ = os.Remove(*socketPath)
-		log.Printf("Also listening on unix socket: %s\n", *socketPath)
+		//log.Printf("Also listening on unix socket: %s\n", *socketPath)
 		go func() {
 			if err := srv.RunUnix(*socketPath); err != nil {
 				log.Fatalf("Unix socket server failed: %v", err)

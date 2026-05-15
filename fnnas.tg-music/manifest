@@ -1,5 +1,5 @@
 appname               = TuneGram
-version               = 1.0.0
+version               = 0.1.0
 display_name          = TuneGram
 desc                  = Telegram 频道音乐下载工具
 arch                  = x86_64

@@ -2,9 +2,9 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -34,7 +34,7 @@ func (s *Server) startDownload(c *gin.Context) {
 		return
 	}
 
-	if err := s.downloadManager.Start(context.Background(), cfg.Channels, cfg.DownloadDir); err != nil {
+	if err := s.downloadManager.Start(context.Background()); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -51,6 +51,7 @@ func (s *Server) stopDownload(c *gin.Context) {
 		return
 	}
 	s.downloadState.AddLog("下载任务已手动停止")
+	s.downloadState.SetRunning(false, "")
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "下载任务已停止"})
 }
 
@@ -118,16 +119,28 @@ func (s *Server) quickTest(c *gin.Context) {
 }
 
 func (s *Server) listDirs(c *gin.Context) {
-	paths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
-	s.logger.Info(fmt.Sprintf("Accessible paths from environment: %s", paths))
+	paths := ""
+
+	// 1. Read from file (updated by config_callback without restart)
+	pathsFile := filepath.Join(s.config.ConfigDir(), "accessible_paths")
+	if data, err := os.ReadFile(pathsFile); err == nil {
+		paths = strings.TrimSpace(string(data))
+	}
+
+	// 2. Fallback to env var
+	if paths == "" {
+		paths = os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
+	}
+
+	// 3. Fallback to config download dir
 	if paths == "" {
 		cfg := s.config.Get()
-		if cfg.DownloadDir != "" {
-			paths = cfg.DownloadDir
-		} else {
-			c.JSON(http.StatusOK, []string{})
-			return
-		}
+		paths = cfg.DownloadDir
+	}
+
+	if paths == "" {
+		c.JSON(http.StatusOK, []string{})
+		return
 	}
 
 	var result []string

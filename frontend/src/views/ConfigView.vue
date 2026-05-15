@@ -41,7 +41,7 @@ const proxyLoading = ref(false)
 async function loadDirOptions() {
   try {
     const data = await getDownloadDirList()
-    pickerDirs.value = data.data || []
+    pickerDirs.value = Array.isArray(data) ? data : (data.data || [])
   } catch (e: any) {
     console.error('loadDirOptions error:', e)
   }
@@ -245,12 +245,7 @@ function removeChannel(i: number) {
 }
 
 onMounted(() => {
-  if (password.value) {
-    getConfig().then(fillConfig).then(loadAuthStatus).catch(() => {
-      password.value = ''
-      showLogin.value = true
-    })
-  }
+  getConfig().then(fillConfig).then(loadAuthStatus).catch(() => {})
 })
 </script>
 

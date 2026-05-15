@@ -3,7 +3,6 @@ package api
 import (
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -52,10 +51,6 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
-			if h.getState != nil {
-				state := h.getState()
-				h.broadcast <- WSMessage{Type: "download_status", Payload: state}
-			}
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -83,11 +78,6 @@ func (h *Hub) Broadcast(typ string, data interface{}) {
 	h.broadcast <- WSMessage{Type: typ, Payload: data}
 }
 
-const (
-	pingInterval = 30 * time.Second
-	pongWait     = 60 * time.Second
-)
-
 // HandleWS upgrades an HTTP connection to WebSocket and pumps read messages.
 func (h *Hub) HandleWS(c *gin.Context) {
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -95,29 +85,17 @@ func (h *Hub) HandleWS(c *gin.Context) {
 		return
 	}
 
-	conn.SetReadDeadline(time.Now().Add(pongWait))
-	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
-	})
-
 	h.register <- conn
 
-	go func() {
-		ticker := time.NewTicker(pingInterval)
-		defer ticker.Stop()
-		for range ticker.C {
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(pongWait)); err != nil {
-				conn.Close()
-				return
-			}
-		}
-	}()
-
 	for {
-		if _, _, err := conn.ReadMessage(); err != nil {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
 			h.unregister <- conn
 			return
+		}
+		// Respond to application-level ping
+		if string(msg) == `{"type":"ping"}` {
+			_ = conn.WriteMessage(1, []byte(`{"type":"pong"}`))
 		}
 	}
 }

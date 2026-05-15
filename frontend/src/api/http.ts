@@ -93,7 +93,7 @@ export async function getDownloadDirList() {
     return res.data
 }
 
-export async function testProxy(proxy: { scheme: string; hostname: string; port: number; username: string; password: string }) {
-    const res = await http.post('/config/proxy/test', { proxy })
+export async function testProxy() {
+    const res = await http.post('/config/proxy/test')
     return res.data
 }

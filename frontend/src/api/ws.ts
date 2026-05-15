@@ -12,6 +12,8 @@ let handlers: Handler[] = []
 let reconnectDelay = 5000
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+
 export function connect(onStateSnapshot?: (payload: any) => void) {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const url = `${protocol}//${location.host}/api/ws`
@@ -20,6 +22,12 @@ export function connect(onStateSnapshot?: (payload: any) => void) {
 
   ws.onopen = () => {
     reconnectDelay = 5000
+    if (heartbeatTimer) clearInterval(heartbeatTimer)
+    heartbeatTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({type: 'ping'}))
+      }
+    }, 10000)
   }
 
   ws.onmessage = (event) => {
@@ -48,6 +56,7 @@ export function onMessage(handler: Handler) {
 
 export function disconnect() {
   if (reconnectTimer) clearTimeout(reconnectTimer)
+  if (heartbeatTimer) clearInterval(heartbeatTimer)
   ws?.close()
   handlers = []
 }

@@ -37,9 +37,10 @@ type Server struct {
 // NewServer creates a new Server with all subcomponents initialized.
 func NewServer(cfg *config.Manager, webFS fs.FS, version, buildTime string) *Server {
 	gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
 
-	logger, _ := zap.NewProduction()
+	logger := zap.NewNop()
 	dlState := download.NewDownloadState()
 
 	s := &Server{
@@ -93,7 +94,7 @@ func (s *Server) ensureTelegramClient() error {
 	dlState.SetBroadcaster(func(typ string, data interface{}) {
 		s.hub.Broadcast(typ, data)
 	})
-	s.downloadManager = download.NewManager(client, dlState, s.hub)
+	s.downloadManager = download.NewManager(client, dlState, s.hub, s.config)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.runningCtx = ctx

@@ -58,6 +58,15 @@ func NewManager(configPath string) (*Manager, error) {
 	return &Manager{cfg: cfg, path: configPath, modTime: modTime}, nil
 }
 
+func (m *Manager) GetChannels() ([]string, string) {
+	c := m.Get()
+	return c.Channels, c.DownloadDir
+}
+
+func (m *Manager) ConfigDir() string {
+	return filepath.Dir(m.path)
+}
+
 func (m *Manager) Get() Config {
 	m.reloadIfChanged()
 	m.mu.RLock()

@@ -25,19 +25,22 @@ SERVER_BIN="${TRIM_APPDEST}/server/tg-music-server"
 
 mkdir -p "${SESSION_DIR}"
 
+# Write accessible paths for Go process to read dynamically
+echo "${TRIM_DATA_ACCESSIBLE_PATHS:-}" > "${TRIM_PKGVAR}/accessible_paths"
+
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
 }
 
-log_msg "=== Starting TuneGram ==="
-log_msg "TRIM_PKGVAR='${TRIM_PKGVAR:-}'"
-log_msg "TRIM_APPDEST='${TRIM_APPDEST:-}'"
-log_msg "TRIM_DATA_ACCESSIBLE_PATHS='${TRIM_DATA_ACCESSIBLE_PATHS:-}'"
-log_msg "APP_PORT='${APP_PORT}'"
-log_msg "SERVER_BIN='${SERVER_BIN}'"
-log_msg "CONFIG_FILE='${CONFIG_FILE}'"
-log_msg "SESSION_DIR='${SESSION_DIR}'"
-log_msg "SOCKET_FILE='${SOCKET_FILE}'"
+#log_msg "=== Starting TuneGram ==="
+#log_msg "TRIM_PKGVAR='${TRIM_PKGVAR:-}'"
+#log_msg "TRIM_APPDEST='${TRIM_APPDEST:-}'"
+#log_msg "TRIM_DATA_ACCESSIBLE_PATHS='${TRIM_DATA_ACCESSIBLE_PATHS:-}'"
+#log_msg "APP_PORT='${APP_PORT}'"
+#log_msg "SERVER_BIN='${SERVER_BIN}'"
+#log_msg "CONFIG_FILE='${CONFIG_FILE}'"
+#log_msg "SESSION_DIR='${SESSION_DIR}'"
+#log_msg "SOCKET_FILE='${SOCKET_FILE}'"
 
 # Check binary exists
 if [ ! -x "${SERVER_BIN}" ]; then
@@ -48,7 +51,7 @@ fi
 # write the command to start your program here
 CMD="${SERVER_BIN} -port ${APP_PORT} -config ${CONFIG_FILE} -socket ${SOCKET_FILE} -session-dir ${SESSION_DIR}"
 
-log_msg "CMD=${CMD}"
+#log_msg "CMD=${CMD}"
 
 start_process() {
     if status; then

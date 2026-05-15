@@ -75,6 +75,8 @@ function initPage(data: any) {
 
 async function doQuickTest() {
   await quickTest()
+  const data = await getDownloadStatus()
+  running.value = data.running
 }
 
 async function doScan() {
@@ -83,10 +85,14 @@ async function doScan() {
 
 async function doStop() {
   await stopDownload()
+  const data = await getDownloadStatus()
+  running.value = data.running
 }
 
 async function doStartAll() {
   await startDownload()
+  const data = await getDownloadStatus()
+  running.value = data.running
 }
 
 async function doDownloadSingle(ch: string, msgId: number) {
@@ -116,9 +122,7 @@ function applyFilters() {
 }
 
 onMounted(async () => {
-  if (getAdminPassword()) {
-    getDownloadStatus().then(initPage).catch(() => { showLogin.value = true })
-  }
+  getDownloadStatus().then(initPage).catch(() => { showLogin.value = true })
 })
 
 onUnmounted(() => { disconnect() })
