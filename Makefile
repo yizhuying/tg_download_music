@@ -1,5 +1,5 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-BUILD_TIME := $(shell date '+%Y-%m-%d %H:%M:%S')
+BUILD_TIME := $(shell date '+%Y-%m-%d_%H:%M:%S')
 LDFLAGS := -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME)
 
 .PHONY: build build-frontend build-server dev clean fnos
