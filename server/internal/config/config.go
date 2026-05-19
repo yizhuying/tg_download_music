@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -38,10 +39,13 @@ func Defaults() Config {
 }
 
 type Manager struct {
-	mu      sync.RWMutex
-	cfg     Config
-	path    string
-	modTime time.Time
+	mu            sync.RWMutex
+	cfg           Config
+	path          string
+	modTime       time.Time
+	accessPathMu  sync.RWMutex
+	accessPathMod time.Time
+	cachedPaths   string
 }
 
 func NewManager(configPath string) (*Manager, error) {
@@ -72,17 +76,93 @@ func (m *Manager) Get() Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	c := m.cfg
-	if !isWritable(c.DownloadDir) {
-		if paths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"); paths != "" {
-			for _, p := range filepath.SplitList(paths) {
-				if isWritable(p) {
-					c.DownloadDir = p
-					break
-				}
+
+	dir := m.resolveDownloadDir(c.DownloadDir)
+	if dir != "" {
+		c.DownloadDir = dir
+	}
+	return c
+}
+
+func (m *Manager) AccessibleDirs() []string {
+	paths := m.loadAccessiblePaths()
+	if paths == "" {
+		paths = os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
+	}
+	if paths == "" {
+		paths = m.Get().DownloadDir
+	}
+	if paths == "" {
+		return nil
+	}
+
+	var result []string
+	for _, p := range strings.Split(paths, ":") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+func (m *Manager) resolveDownloadDir(cfgDir string) string {
+	accessible := m.loadAccessiblePaths()
+	if accessible != "" {
+		first := strings.SplitN(accessible, ":", 2)[0]
+		if isWritable(first) {
+			return first
+		}
+	}
+
+	if envPaths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"); envPaths != "" {
+		for _, p := range filepath.SplitList(envPaths) {
+			if isWritable(p) {
+				return p
 			}
 		}
 	}
-	return c
+
+	if !isWritable(cfgDir) {
+		return ""
+	}
+	return cfgDir
+}
+
+func (m *Manager) loadAccessiblePaths() string {
+	pathsFile := filepath.Join(filepath.Dir(m.path), "accessible_paths")
+
+	m.accessPathMu.RLock()
+	cached, cachedMod := m.cachedPaths, m.accessPathMod
+	m.accessPathMu.RUnlock()
+
+	info, err := os.Stat(pathsFile)
+	if err != nil {
+		m.accessPathMu.Lock()
+		m.cachedPaths = ""
+		m.accessPathMu.Unlock()
+		return ""
+	}
+
+	if !info.ModTime().After(cachedMod) {
+		m.accessPathMu.RLock()
+		result := m.cachedPaths
+		m.accessPathMu.RUnlock()
+		return result
+	}
+
+	data, err := os.ReadFile(pathsFile)
+	if err != nil {
+		return cached
+	}
+	content := strings.TrimSpace(string(data))
+
+	m.accessPathMu.Lock()
+	m.cachedPaths = content
+	m.accessPathMod = info.ModTime()
+	m.accessPathMu.Unlock()
+
+	return content
 }
 
 func isWritable(path string) bool {

@@ -3,9 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -119,37 +116,9 @@ func (s *Server) quickTest(c *gin.Context) {
 }
 
 func (s *Server) listDirs(c *gin.Context) {
-	paths := ""
-
-	// 1. Read from file (updated by config_callback without restart)
-	pathsFile := filepath.Join(s.config.ConfigDir(), "accessible_paths")
-	if data, err := os.ReadFile(pathsFile); err == nil {
-		paths = strings.TrimSpace(string(data))
+	dirs := s.config.AccessibleDirs()
+	if dirs == nil {
+		dirs = []string{}
 	}
-
-	// 2. Fallback to env var
-	if paths == "" {
-		paths = os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
-	}
-
-	// 3. Fallback to config download dir
-	if paths == "" {
-		cfg := s.config.Get()
-		paths = cfg.DownloadDir
-	}
-
-	if paths == "" {
-		c.JSON(http.StatusOK, []string{})
-		return
-	}
-
-	var result []string
-	for _, p := range strings.Split(paths, ":") {
-		if p == "" {
-			continue
-		}
-		result = append(result, p)
-	}
-
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, dirs)
 }
