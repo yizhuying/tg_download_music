@@ -40,23 +40,25 @@ type Manager struct {
 	client TelegramAPI
 	hub    Broadcaster
 	config ConfigProvider
+	record *DownloadRecord
 	mu     sync.Mutex
 	cancel context.CancelFunc
 }
 
 // NewManager creates a new Manager.
 func NewManager(client TelegramAPI, state *DownloadState, hub Broadcaster, config ConfigProvider) *Manager {
-	return &Manager{client: client, state: state, hub: hub, config: config}
+	return &Manager{
+		client: client,
+		state:  state,
+		hub:    hub,
+		config: config,
+		record: NewDownloadRecord(config.ConfigDir()),
+	}
 }
 
 func sanitizeFilename(name string) string {
 	re := regexp.MustCompile(`[\\/*?:"<>|]`)
 	return re.ReplaceAllString(name, "_")
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 func isAudio(doc *tg.Document) bool {
@@ -290,8 +292,7 @@ func (m *Manager) DownloadSingle(ctx context.Context, channel, dir string, msgID
 			m.state.AddLog("下载失败")
 			return
 		}
-		m.state.MarkDownloaded(channel, msgID)
-		m.state.IncrementDownloaded()
+		m.afterDownloadSuccess(channel, msgID, "")
 		m.state.AddLog("下载完成")
 	}()
 
@@ -381,9 +382,8 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 				}
 				m.state.AddLog(fmt.Sprintf("下载错误: %v", err))
 			} else if success {
-				m.state.MarkDownloaded(channel, msgMsg.ID)
-				m.state.IncrementDownloaded()
-				m.state.AddLog("快速测试完成")
+				m.afterDownloadSuccess(channel, msgMsg.ID, "")
+				m.state.AddLog("快速测试完成，请检查下载目录")
 			} else {
 				m.state.AddLog("下载失败")
 			}
@@ -459,8 +459,8 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 			}
 			saveName := fmt.Sprintf("%d_%s", msgMsg.ID, sanitizeFilename(docFileName(doc)))
 			savePath := filepath.Join(dirPath, saveName)
-			if fileExists(savePath) {
-				m.state.AddLog(fmt.Sprintf("文件已存在，跳过: %s", filepath.Base(savePath)))
+			if m.record.Exists(channel, msgMsg.ID) {
+				m.state.AddLog(fmt.Sprintf("文件已下载，跳过: %s", saveName))
 				continue
 			}
 
@@ -472,8 +472,8 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 				m.state.AddLog(fmt.Sprintf("下载失败: %v", err))
 				continue
 			}
-			m.state.AddLog(fmt.Sprintf("下载完成: %s", filepath.Base(savePath)))
-			m.state.IncrementDownloaded()
+			m.state.AddLog("下载完成")
+			m.afterDownloadSuccess(channel, msgMsg.ID, saveName)
 			count++
 		}
 
@@ -532,14 +532,13 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 				continue
 			}
 			fileName := sanitizeFilename(docFileName(doc))
-			savePath := filepath.Join(dirPath, fmt.Sprintf("%d_%s", msgMsg.ID, fileName))
 			messages = append(messages, ScannedMessage{
 				Channel:      channel,
 				ChannelTitle: ch.Title,
 				MsgID:        msgMsg.ID,
 				FileName:     fileName,
 				FileSize:     doc.Size,
-				Exists:       fileExists(savePath),
+				Exists:       m.record.Exists(channel, msgMsg.ID),
 			})
 		}
 
@@ -581,12 +580,20 @@ func (m *Manager) downloadMessage(ctx context.Context, channel, dir string, msgI
 	}
 	savePath := filepath.Join(dirPath, fmt.Sprintf("%d_%s", msgID, sanitizeFilename(docFileName(doc))))
 
-	if fileExists(savePath) {
+	if m.record.Exists(channel, msgID) {
 		return true, nil
 	}
 
 	return true, m.downloadDocument(ctx, doc, savePath)
 }
+
+func (m *Manager) afterDownloadSuccess(channel string, msgID int, fileName string) {
+	m.record.Add(channel, msgID, fileName)
+	m.state.MarkDownloaded(channel, msgID)
+	m.state.IncrementDownloaded()
+}
+
+const maxDownloadRetries = 3
 
 func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePath string) error {
 	location := &tg.InputDocumentFileLocation{
