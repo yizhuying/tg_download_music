@@ -178,16 +178,12 @@ func (m *Manager) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				m.state.AddLog("下载任务已手动停止")
 				return
 			default:
 			}
 
 			channels, downloadDir := m.config.GetChannels()
 			m.state.AddLog(fmt.Sprintf("获取下载目录: %s", downloadDir))
-			debugInfo := m.config.ResolveDebugInfo()
-			m.state.AddLog(fmt.Sprintf("调试信息: cfg=%s, accessible=%s, env=%s, resolved=%s",
-				debugInfo["cfg_download_dir"], debugInfo["accessible_paths"], debugInfo["env_accessible"], debugInfo["resolved"]))
 
 			var next string
 			for _, ch := range channels {
@@ -206,7 +202,7 @@ func (m *Manager) Start(ctx context.Context) error {
 			m.state.AddLog(fmt.Sprintf("开始处理频道: %s", next))
 
 			count, err := m.downloadChannel(ctx, next, downloadDir)
-			if err != nil {
+			if err != nil && ctx.Err() == nil {
 				m.state.AddLog(fmt.Sprintf("频道 %s 下载失败: %v", next, err))
 				continue
 			}
@@ -227,6 +223,7 @@ func (m *Manager) Stop() error {
 		return fmt.Errorf("no download running")
 	}
 	m.cancel()
+	m.state.AddLog("下载任务已手动停止")
 	return nil
 }
 
@@ -378,6 +375,10 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 			m.state.AddLog(fmt.Sprintf("找到音频，消息ID: %d", msgMsg.ID))
 			success, err := m.downloadMessage(ctx, channel, dir, msgMsg.ID)
 			if err != nil {
+				if ctx.Err() != nil {
+					m.state.AddLog("下载已停止")
+					return
+				}
 				m.state.AddLog(fmt.Sprintf("下载错误: %v", err))
 			} else if success {
 				m.state.MarkDownloaded(channel, msgMsg.ID)
@@ -424,6 +425,9 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 			Limit:    100,
 		})
 		if err != nil {
+			if ctx.Err() != nil {
+				return count, nil
+			}
 			return count, err
 		}
 
@@ -462,10 +466,13 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 
 			m.state.AddLog(fmt.Sprintf("正在下载: %s", filepath.Base(savePath)))
 			if err := m.downloadDocument(ctx, doc, savePath); err != nil {
+				if ctx.Err() != nil {
+					return count, nil
+				}
 				m.state.AddLog(fmt.Sprintf("下载失败: %v", err))
 				continue
 			}
-			m.state.AddLog("下载完成")
+			m.state.AddLog(fmt.Sprintf("下载完成: %s", filepath.Base(savePath)))
 			m.state.IncrementDownloaded()
 			count++
 		}

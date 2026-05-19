@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -137,21 +136,17 @@ func dirLabel(path string) string {
 }
 
 func (m *Manager) resolveDownloadDir(cfgDir string) string {
-	log.Printf("[config] resolveDownloadDir: cfgDir=%q", cfgDir)
 
 	// User's explicit choice takes priority
 	if cfgDir != "" && isWritable(cfgDir) {
-		log.Printf("[config] resolveDownloadDir: using cfgDir=%q", cfgDir)
 		return cfgDir
 	}
 
 	// Auto-discover from accessible_paths file
 	accessible := m.loadAccessiblePaths()
-	log.Printf("[config] resolveDownloadDir: accessible=%q", accessible)
 	if accessible != "" {
 		first := strings.SplitN(accessible, ":", 2)[0]
 		if isWritable(first) {
-			log.Printf("[config] resolveDownloadDir: using accessible=%q", first)
 			return first
 		}
 	}
@@ -160,7 +155,6 @@ func (m *Manager) resolveDownloadDir(cfgDir string) string {
 	if envPaths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"); envPaths != "" {
 		for _, p := range filepath.SplitList(envPaths) {
 			if isWritable(p) {
-				log.Printf("[config] resolveDownloadDir: using env=%q", p)
 				return p
 			}
 		}
@@ -173,13 +167,11 @@ func (m *Manager) resolveDownloadDir(cfgDir string) string {
 		for _, e := range entries {
 			p := filepath.Join(shareDir, e.Name())
 			if isWritable(p) {
-				log.Printf("[config] resolveDownloadDir: using share=%q", p)
 				return p
 			}
 		}
 	}
 
-	log.Printf("[config] resolveDownloadDir: no writable directory found")
 	return ""
 }
 
