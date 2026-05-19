@@ -52,7 +52,8 @@
             "required": true,
             "message": "请输入管理密码"
           }
-        ]
+        ],
+        "helpText": "默认密码为 admin，登录后请及时修改"
       }
     ]
   }

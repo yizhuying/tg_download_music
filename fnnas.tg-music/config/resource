@@ -4,7 +4,7 @@
         "shares":
         [
             {
-                "name": "downloads",
+                "name": "TuneGram/music",
                 "permission":
                 {
                     "rw":
