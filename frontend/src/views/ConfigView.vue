@@ -22,7 +22,7 @@ const proxyHostname = ref('')
 const proxyPort = ref(0)
 const proxyUsername = ref('')
 const proxyPassword = ref('')
-const downloadDir = ref('./downloads')
+const downloadDir = ref('')
 const channels = ref<string[]>([])
 
 const authLoading = ref(true)
@@ -34,7 +34,7 @@ const authCode = ref('')
 const show2FA = ref(false)
 const auth2FA = ref('')
 
-const pickerDirs = ref<string[]>([])
+const pickerDirs = ref<Array<{path: string, label: string}>>([])
 const pickerLoading = ref(false)
 const proxyLoading = ref(false)
 
@@ -89,8 +89,18 @@ function fillConfig(data: any) {
   proxyPort.value = p.port || 0
   proxyUsername.value = p.username || ''
   proxyPassword.value = p.password || ''
-  downloadDir.value = data.download_dir || './downloads'
   channels.value = data.channels || []
+
+  const dirs: Array<{path: string, label: string}> = data.accessible_dirs || []
+  if (dirs.length > 0) {
+    pickerDirs.value = dirs
+    const currentPath = data.download_dir || ''
+    const matchDir = dirs.find((d: any) => d.path === currentPath)
+    downloadDir.value = matchDir ? matchDir.path : dirs[0].path
+  } else {
+    pickerDirs.value = [{path: './downloads', label: 'TuneGram/music'}]
+    downloadDir.value = data.download_dir || './downloads'
+  }
 }
 
 async function loadAuthStatus() {
@@ -364,7 +374,7 @@ onMounted(() => {
         <h2>存储路径</h2>
         <el-select v-model="downloadDir" placeholder="选择下载目录" :loading="pickerLoading"
                    style="width: 100%" @visible-change="onDirSelectVisible">
-          <el-option v-for="p in pickerDirs" :key="p" :label="p" :value="p"/>
+          <el-option v-for="d in pickerDirs" :key="d.path" :label="d.label" :value="d.path"/>
         </el-select>
       </div>
 

@@ -1,7 +1,7 @@
 appname               = TuneGram
 version               = 0.1.0
 display_name          = TuneGram
-desc                  = Telegram 频道音乐下载工具
+desc                  = Telegram 频道音乐下载工具，默认密码为 admin，如需修改密码，请在按照时输入新的密码<br\> 首次使用建议新增下载目录
 arch                  = x86_64
 source                = thirdparty
 maintainer            = yizhuying

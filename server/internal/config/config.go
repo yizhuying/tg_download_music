@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -33,7 +34,7 @@ func Defaults() Config {
 		SessionName: "my_session",
 		Channels:    []string{},
 		Proxy:       Proxy{Scheme: "socks5"},
-		DownloadDir: "./downloads",
+		DownloadDir: "",
 		SessionDir:  "./sessions",
 	}
 }
@@ -84,7 +85,12 @@ func (m *Manager) Get() Config {
 	return c
 }
 
-func (m *Manager) AccessibleDirs() []string {
+type DirOption struct {
+	Path  string `json:"path"`
+	Label string `json:"label"`
+}
+
+func (m *Manager) AccessibleDirs() []DirOption {
 	paths := m.loadAccessiblePaths()
 	if paths == "" {
 		paths = os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
@@ -96,14 +102,19 @@ func (m *Manager) AccessibleDirs() []string {
 		return nil
 	}
 
-	var result []string
+	var result []DirOption
 	for _, p := range strings.Split(paths, ":") {
 		p = strings.TrimSpace(p)
 		if p != "" {
-			result = append(result, p)
+			result = append(result, DirOption{Path: p, Label: dirLabel(p)})
 		}
 	}
 	return result
+}
+
+func dirLabel(path string) string {
+	re := regexp.MustCompile(`^/vol\d+/@appshare/`)
+	return re.ReplaceAllString(path, "")
 }
 
 func (m *Manager) resolveDownloadDir(cfgDir string) string {
@@ -123,10 +134,14 @@ func (m *Manager) resolveDownloadDir(cfgDir string) string {
 		}
 	}
 
-	if !isWritable(cfgDir) {
-		return ""
+	if cfgDir != "" && isWritable(cfgDir) {
+		return cfgDir
 	}
-	return cfgDir
+
+	if isWritable("./downloads") {
+		return "./downloads"
+	}
+	return ""
 }
 
 func (m *Manager) loadAccessiblePaths() string {

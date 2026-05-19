@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"tg-music/internal/config"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -118,7 +120,7 @@ func (s *Server) quickTest(c *gin.Context) {
 func (s *Server) listDirs(c *gin.Context) {
 	dirs := s.config.AccessibleDirs()
 	if dirs == nil {
-		dirs = []string{}
+		dirs = []config.DirOption{}
 	}
 	c.JSON(http.StatusOK, dirs)
 }

@@ -15,7 +15,18 @@ import (
 
 func (s *Server) getConfig(c *gin.Context) {
 	cfg := s.config.Get()
-	c.JSON(http.StatusOK, cfg)
+	dirs := s.config.AccessibleDirs()
+	c.JSON(http.StatusOK, gin.H{
+		"api_id":          cfg.APIID,
+		"api_hash":        cfg.APIHash,
+		"session_name":    cfg.SessionName,
+		"channels":        cfg.Channels,
+		"proxy":           cfg.Proxy,
+		"download_dir":    cfg.DownloadDir,
+		"session_dir":     cfg.SessionDir,
+		"phone_number":    cfg.PhoneNumber,
+		"accessible_dirs": dirs,
+	})
 }
 
 func (s *Server) saveConfig(c *gin.Context) {
