@@ -31,6 +31,7 @@ type Broadcaster interface {
 type ConfigProvider interface {
 	GetChannels() ([]string, string)
 	ConfigDir() string
+	ResolveDebugInfo() map[string]string
 }
 
 // Manager orchestrates channel scanning and audio downloading.
@@ -183,6 +184,10 @@ func (m *Manager) Start(ctx context.Context) error {
 			}
 
 			channels, downloadDir := m.config.GetChannels()
+			m.state.AddLog(fmt.Sprintf("获取下载目录: %s", downloadDir))
+			debugInfo := m.config.ResolveDebugInfo()
+			m.state.AddLog(fmt.Sprintf("调试信息: cfg=%s, accessible=%s, env=%s, resolved=%s",
+				debugInfo["cfg_download_dir"], debugInfo["accessible_paths"], debugInfo["env_accessible"], debugInfo["resolved"]))
 
 			var next string
 			for _, ch := range channels {
@@ -310,6 +315,10 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 
 	m.state.SetRunning(true, channel)
 	m.state.AddLog(fmt.Sprintf("测试频道: %s", channel))
+	debugInfo := m.config.ResolveDebugInfo()
+	m.state.AddLog(fmt.Sprintf("[调试] cfg_download_dir=%s, accessible_paths=%s, env=%s, resolved=%s",
+		debugInfo["cfg_download_dir"], debugInfo["accessible_paths"], debugInfo["env_accessible"], debugInfo["resolved"]))
+	m.state.AddLog(fmt.Sprintf("下载目录: %s", dir))
 	m.state.AddLog("获取第一条音频...")
 
 	go func() {
@@ -392,9 +401,10 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 		return 0, fmt.Errorf("resolve channel: %w", err)
 	}
 
-	dirPath := filepath.Join(downloadDir, channel)
+	dirPath := filepath.Join(downloadDir, sanitizeFilename(channel))
+	m.state.AddLog(fmt.Sprintf("创建频道目录: %s", dirPath))
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("创建目录 %s 失败: %w", dirPath, err)
 	}
 
 	count := 0
@@ -474,9 +484,9 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 		return nil, fmt.Errorf("resolve channel: %w", err)
 	}
 
-	dirPath := filepath.Join(downloadDir, channel)
+	dirPath := filepath.Join(downloadDir, sanitizeFilename(channel))
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("创建目录 %s 失败: %w", dirPath, err)
 	}
 
 	var messages []ScannedMessage
@@ -558,9 +568,9 @@ func (m *Manager) downloadMessage(ctx context.Context, channel, dir string, msgI
 		return false, fmt.Errorf("no audio document in message")
 	}
 
-	dirPath := filepath.Join(dir, channel)
+	dirPath := filepath.Join(dir, sanitizeFilename(channel))
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
-		return false, err
+		return false, fmt.Errorf("创建目录 %s 失败: %w", dirPath, err)
 	}
 	savePath := filepath.Join(dirPath, fmt.Sprintf("%d_%s", msgID, sanitizeFilename(docFileName(doc))))
 

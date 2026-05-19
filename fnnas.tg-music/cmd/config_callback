@@ -1,7 +1,19 @@
 #!/bin/bash
 
-# Called after user changes app settings in fnOS
-# Update accessible paths file for Go process to read dynamically
-echo "${TRIM_DATA_ACCESSIBLE_PATHS:-}" > "${TRIM_PKGVAR}/accessible_paths"
+# Merge TRIM_DATA_SHARE_PATHS and TRIM_DATA_ACCESSIBLE_PATHS
+DATA_SHARE_PATHS="${TRIM_DATA_SHARE_PATHS:-}:${TRIM_DATA_ACCESSIBLE_PATHS:-}"
+MERGED=""
+IFS=':'
+for p in ${DATA_SHARE_PATHS}; do
+    if [ -n "${p}" ]; then
+        case ":${MERGED}:" in
+            *":${p}:"*) ;;
+            *) MERGED="${MERGED:+${MERGED}:}${p}" ;;
+        esac
+    fi
+done
+unset IFS
+
+echo "${MERGED}" > "${TRIM_PKGVAR}/accessible_paths"
 
 exit 0

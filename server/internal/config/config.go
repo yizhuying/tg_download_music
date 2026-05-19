@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -90,16 +91,24 @@ type DirOption struct {
 	Label string `json:"label"`
 }
 
+func (m *Manager) ResolveDebugInfo() map[string]string {
+	accessible := m.loadAccessiblePaths()
+	envPaths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
+	m.mu.RLock()
+	cfgDir := m.cfg.DownloadDir
+	m.mu.RUnlock()
+	return map[string]string{
+		"cfg_download_dir": cfgDir,
+		"accessible_paths": accessible,
+		"env_accessible":   envPaths,
+		"resolved":         m.Get().DownloadDir,
+	}
+}
+
 func (m *Manager) AccessibleDirs() []DirOption {
 	paths := m.loadAccessiblePaths()
 	if paths == "" {
 		paths = os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
-	}
-	if paths == "" {
-		paths = m.Get().DownloadDir
-	}
-	if paths == "" {
-		return nil
 	}
 
 	var result []DirOption
@@ -109,6 +118,16 @@ func (m *Manager) AccessibleDirs() []DirOption {
 			result = append(result, DirOption{Path: p, Label: dirLabel(p)})
 		}
 	}
+
+	if len(result) == 0 {
+		cfgDir := m.Get().DownloadDir
+		if cfgDir != "" {
+			result = append(result, DirOption{Path: cfgDir, Label: dirLabel(cfgDir)})
+		} else {
+			result = append(result, DirOption{Path: "", Label: "TuneGram/music"})
+		}
+	}
+
 	return result
 }
 
@@ -118,29 +137,49 @@ func dirLabel(path string) string {
 }
 
 func (m *Manager) resolveDownloadDir(cfgDir string) string {
+	log.Printf("[config] resolveDownloadDir: cfgDir=%q", cfgDir)
+
+	// User's explicit choice takes priority
+	if cfgDir != "" && isWritable(cfgDir) {
+		log.Printf("[config] resolveDownloadDir: using cfgDir=%q", cfgDir)
+		return cfgDir
+	}
+
+	// Auto-discover from accessible_paths file
 	accessible := m.loadAccessiblePaths()
+	log.Printf("[config] resolveDownloadDir: accessible=%q", accessible)
 	if accessible != "" {
 		first := strings.SplitN(accessible, ":", 2)[0]
 		if isWritable(first) {
+			log.Printf("[config] resolveDownloadDir: using accessible=%q", first)
 			return first
 		}
 	}
 
+	// Env var
 	if envPaths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"); envPaths != "" {
 		for _, p := range filepath.SplitList(envPaths) {
 			if isWritable(p) {
+				log.Printf("[config] resolveDownloadDir: using env=%q", p)
 				return p
 			}
 		}
 	}
 
-	if cfgDir != "" && isWritable(cfgDir) {
-		return cfgDir
+	// Shares directory
+	shareDir := filepath.Join(filepath.Dir(m.path), "..", "shares")
+	entries, err := os.ReadDir(shareDir)
+	if err == nil {
+		for _, e := range entries {
+			p := filepath.Join(shareDir, e.Name())
+			if isWritable(p) {
+				log.Printf("[config] resolveDownloadDir: using share=%q", p)
+				return p
+			}
+		}
 	}
 
-	if isWritable("./downloads") {
-		return "./downloads"
-	}
+	log.Printf("[config] resolveDownloadDir: no writable directory found")
 	return ""
 }
 
@@ -156,7 +195,8 @@ func (m *Manager) loadAccessiblePaths() string {
 		m.accessPathMu.Lock()
 		m.cachedPaths = ""
 		m.accessPathMu.Unlock()
-		return ""
+		// Fallback: merge env vars at runtime
+		return mergePaths(os.Getenv("TRIM_DATA_SHARE_PATHS"), os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"))
 	}
 
 	if !info.ModTime().After(cachedMod) {
@@ -178,6 +218,26 @@ func (m *Manager) loadAccessiblePaths() string {
 	m.accessPathMu.Unlock()
 
 	return content
+}
+
+func mergePaths(sharePaths, accessiblePaths string) string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, p := range strings.Split(sharePaths, ":") {
+		p = strings.TrimSpace(p)
+		if p != "" && !seen[p] {
+			seen[p] = true
+			result = append(result, p)
+		}
+	}
+	for _, p := range strings.Split(accessiblePaths, ":") {
+		p = strings.TrimSpace(p)
+		if p != "" && !seen[p] {
+			seen[p] = true
+			result = append(result, p)
+		}
+	}
+	return strings.Join(result, ":")
 }
 
 func isWritable(path string) bool {

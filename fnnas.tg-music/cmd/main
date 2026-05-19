@@ -14,9 +14,24 @@ if [ -n "${APP_PASSWORD}" ]; then
 fi
 
 # Export fnOS data paths for the Go process
-if [ -n "${TRIM_DATA_ACCESSIBLE_PATHS:-}" ]; then
-    export TRIM_DATA_ACCESSIBLE_PATHS
-fi
+# TRIM_DATA_SHARE_PATHS: always available (from data-share config)
+# TRIM_DATA_ACCESSIBLE_PATHS: V1.1.8+ only
+DATA_SHARE_PATHS="${TRIM_DATA_SHARE_PATHS:-}:${TRIM_DATA_ACCESSIBLE_PATHS:-}"
+# Merge and deduplicate, write to accessible_paths file
+MERGED=""
+IFS=':'
+for p in ${DATA_SHARE_PATHS}; do
+    if [ -n "${p}" ]; then
+        case ":${MERGED}:" in
+            *":${p}:"*) ;;
+            *) MERGED="${MERGED:+${MERGED}:}${p}" ;;
+        esac
+    fi
+done
+unset IFS
+
+export TRIM_DATA_ACCESSIBLE_PATHS="${MERGED}"
+echo "${MERGED}" > "${TRIM_PKGVAR}/accessible_paths"
 
 SESSION_DIR="${TRIM_PKGVAR}/sessions"
 CONFIG_FILE="${TRIM_PKGVAR}/config.json"

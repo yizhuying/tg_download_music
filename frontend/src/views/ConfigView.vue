@@ -98,8 +98,8 @@ function fillConfig(data: any) {
     const matchDir = dirs.find((d: any) => d.path === currentPath)
     downloadDir.value = matchDir ? matchDir.path : dirs[0].path
   } else {
-    pickerDirs.value = [{path: './downloads', label: 'TuneGram/music'}]
-    downloadDir.value = data.download_dir || './downloads'
+    pickerDirs.value = [{path: '', label: 'TuneGram/music'}]
+    downloadDir.value = data.download_dir || ''
   }
 }
 
