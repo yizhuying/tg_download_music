@@ -3,30 +3,19 @@ package api
 import (
 	"fmt"
 	"net"
-	"net/http"
 
 	"go.uber.org/zap"
 	"golang.org/x/net/proxy"
 
 	"tg-music/internal/config"
+	"tg-music/internal/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 func (s *Server) getConfig(c *gin.Context) {
 	cfg := s.config.Get()
-	dirs := s.config.AccessibleDirs()
-	c.JSON(http.StatusOK, gin.H{
-		"api_id":          cfg.APIID,
-		"api_hash":        cfg.APIHash,
-		"session_name":    cfg.SessionName,
-		"channels":        cfg.Channels,
-		"proxy":           cfg.Proxy,
-		"download_dir":    cfg.DownloadDir,
-		"session_dir":     cfg.SessionDir,
-		"phone_number":    cfg.PhoneNumber,
-		"accessible_dirs": dirs,
-	})
+	response.OK(c, cfg)
 }
 
 func (s *Server) saveConfig(c *gin.Context) {
@@ -39,7 +28,7 @@ func (s *Server) saveConfig(c *gin.Context) {
 		DownloadDir string       `json:"download_dir"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid data"})
+		response.BadRequest(c, "invalid data")
 		return
 	}
 
@@ -59,16 +48,16 @@ func (s *Server) saveConfig(c *gin.Context) {
 		PhoneNumber: existing.PhoneNumber,
 	}
 	if err := s.config.Save(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "配置已保存"})
+	response.OKMsg(c, "配置已保存")
 }
 
 func (s *Server) testProxy(c *gin.Context) {
 	p := s.config.Get().Proxy
 	if p.Scheme == "none" || p.Hostname == "" || p.Port == 0 {
-		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "代理未配置"})
+		response.OKMsgData(c, "代理未配置", gin.H{"ok": false})
 		return
 	}
 
@@ -80,13 +69,13 @@ func (s *Server) testProxy(c *gin.Context) {
 
 	dialer, err := proxy.SOCKS5("tcp", addr, auth, proxy.Direct)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"ok": false, "message": fmt.Sprintf("代理配置错误: %s", err.Error())})
+		response.OKMsgData(c, fmt.Sprintf("代理配置错误: %s", err.Error()), gin.H{"ok": false})
 		return
 	}
 
 	conn, err := dialer.Dial("tcp", "api.telegram.org:443")
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"ok": false, "message": fmt.Sprintf("连接失败: %s", err.Error())})
+		response.OKMsgData(c, fmt.Sprintf("连接失败: %s", err.Error()), gin.H{"ok": false})
 		return
 	}
 	defer func(conn net.Conn) {
@@ -96,5 +85,5 @@ func (s *Server) testProxy(c *gin.Context) {
 		}
 	}(conn)
 
-	c.JSON(http.StatusOK, gin.H{"ok": true, "message": fmt.Sprintf("代理 %s 可用，已连通 Telegram", addr)})
+	response.OKMsgData(c, fmt.Sprintf("代理 %s 可用，已连通 Telegram", addr), gin.H{"ok": true})
 }

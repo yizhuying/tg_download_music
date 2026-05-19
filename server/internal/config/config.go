@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
 )
@@ -40,13 +38,10 @@ func Defaults() Config {
 }
 
 type Manager struct {
-	mu            sync.RWMutex
-	cfg           Config
-	path          string
-	modTime       time.Time
-	accessPathMu  sync.RWMutex
-	accessPathMod time.Time
-	cachedPaths   string
+	mu      sync.RWMutex
+	cfg     Config
+	path    string
+	modTime time.Time
 }
 
 func NewManager(configPath string) (*Manager, error) {
@@ -77,159 +72,17 @@ func (m *Manager) Get() Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	c := m.cfg
-
-	dir := m.resolveDownloadDir(c.DownloadDir)
-	if dir != "" {
-		c.DownloadDir = dir
+	if !isWritable(c.DownloadDir) {
+		if paths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"); paths != "" {
+			for _, p := range filepath.SplitList(paths) {
+				if isWritable(p) {
+					c.DownloadDir = p
+					break
+				}
+			}
+		}
 	}
 	return c
-}
-
-type DirOption struct {
-	Path  string `json:"path"`
-	Label string `json:"label"`
-}
-
-func (m *Manager) ResolveDebugInfo() map[string]string {
-	accessible := m.loadAccessiblePaths()
-	envPaths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
-	m.mu.RLock()
-	cfgDir := m.cfg.DownloadDir
-	m.mu.RUnlock()
-	return map[string]string{
-		"cfg_download_dir": cfgDir,
-		"accessible_paths": accessible,
-		"env_accessible":   envPaths,
-		"resolved":         m.Get().DownloadDir,
-	}
-}
-
-func (m *Manager) AccessibleDirs() []DirOption {
-	paths := m.loadAccessiblePaths()
-	if paths == "" {
-		paths = os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS")
-	}
-
-	var result []DirOption
-	for _, p := range strings.Split(paths, ":") {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, DirOption{Path: p, Label: dirLabel(p)})
-		}
-	}
-
-	if len(result) == 0 {
-		cfgDir := m.Get().DownloadDir
-		if cfgDir != "" {
-			result = append(result, DirOption{Path: cfgDir, Label: dirLabel(cfgDir)})
-		} else {
-			result = append(result, DirOption{Path: "", Label: "TuneGram/music"})
-		}
-	}
-
-	return result
-}
-
-func dirLabel(path string) string {
-	re := regexp.MustCompile(`^/vol\d+/@appshare/`)
-	return re.ReplaceAllString(path, "")
-}
-
-func (m *Manager) resolveDownloadDir(cfgDir string) string {
-
-	// User's explicit choice takes priority
-	if cfgDir != "" && isWritable(cfgDir) {
-		return cfgDir
-	}
-
-	// Auto-discover from accessible_paths file
-	accessible := m.loadAccessiblePaths()
-	if accessible != "" {
-		first := strings.SplitN(accessible, ":", 2)[0]
-		if isWritable(first) {
-			return first
-		}
-	}
-
-	// Env var
-	if envPaths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"); envPaths != "" {
-		for _, p := range filepath.SplitList(envPaths) {
-			if isWritable(p) {
-				return p
-			}
-		}
-	}
-
-	// Shares directory
-	shareDir := filepath.Join(filepath.Dir(m.path), "..", "shares")
-	entries, err := os.ReadDir(shareDir)
-	if err == nil {
-		for _, e := range entries {
-			p := filepath.Join(shareDir, e.Name())
-			if isWritable(p) {
-				return p
-			}
-		}
-	}
-
-	return ""
-}
-
-func (m *Manager) loadAccessiblePaths() string {
-	pathsFile := filepath.Join(filepath.Dir(m.path), "accessible_paths")
-
-	m.accessPathMu.RLock()
-	cached, cachedMod := m.cachedPaths, m.accessPathMod
-	m.accessPathMu.RUnlock()
-
-	info, err := os.Stat(pathsFile)
-	if err != nil {
-		m.accessPathMu.Lock()
-		m.cachedPaths = ""
-		m.accessPathMu.Unlock()
-		// Fallback: merge env vars at runtime
-		return mergePaths(os.Getenv("TRIM_DATA_SHARE_PATHS"), os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"))
-	}
-
-	if !info.ModTime().After(cachedMod) {
-		m.accessPathMu.RLock()
-		result := m.cachedPaths
-		m.accessPathMu.RUnlock()
-		return result
-	}
-
-	data, err := os.ReadFile(pathsFile)
-	if err != nil {
-		return cached
-	}
-	content := strings.TrimSpace(string(data))
-
-	m.accessPathMu.Lock()
-	m.cachedPaths = content
-	m.accessPathMod = info.ModTime()
-	m.accessPathMu.Unlock()
-
-	return content
-}
-
-func mergePaths(sharePaths, accessiblePaths string) string {
-	seen := make(map[string]bool)
-	var result []string
-	for _, p := range strings.Split(sharePaths, ":") {
-		p = strings.TrimSpace(p)
-		if p != "" && !seen[p] {
-			seen[p] = true
-			result = append(result, p)
-		}
-	}
-	for _, p := range strings.Split(accessiblePaths, ":") {
-		p = strings.TrimSpace(p)
-		if p != "" && !seen[p] {
-			seen[p] = true
-			result = append(result, p)
-		}
-	}
-	return strings.Join(result, ":")
 }
 
 func isWritable(path string) bool {

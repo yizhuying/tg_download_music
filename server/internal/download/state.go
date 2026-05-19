@@ -50,16 +50,20 @@ func NewDownloadState() *DownloadState {
 func (ds *DownloadState) Get() State {
 	ds.mu.RLock()
 	defer ds.mu.RUnlock()
+	return ds.snapshotLocked()
+}
+
+func (ds *DownloadState) snapshotLocked() State {
 	s := ds.state
 	s.Logs = make([]LogEntry, len(ds.state.Logs))
 	copy(s.Logs, ds.state.Logs)
 	return s
 }
 
-// SetRunning updates the running flag and optionally the current channel.
+// SetRunning updates the running flag and optionally the current channel,
+// and broadcasts the state change via WebSocket.
 func (ds *DownloadState) SetRunning(running bool, channel string) {
 	ds.mu.Lock()
-	defer ds.mu.Unlock()
 	ds.state.Running = running
 	ds.state.CurrentChannel = channel
 	if running {
@@ -67,13 +71,25 @@ func (ds *DownloadState) SetRunning(running bool, channel string) {
 		ds.state.TotalDownloaded = 0
 		ds.state.Logs = make([]LogEntry, 0, 100)
 	}
+	st := ds.snapshotLocked()
+	ds.mu.Unlock()
+
+	if ds.broadcaster != nil {
+		ds.broadcaster("download_status", st)
+	}
 }
 
-// IncrementDownloaded atomically increases the total download counter.
+// IncrementDownloaded atomically increases the total download counter
+// and broadcasts the updated state via WebSocket.
 func (ds *DownloadState) IncrementDownloaded() {
 	ds.mu.Lock()
-	defer ds.mu.Unlock()
 	ds.state.TotalDownloaded++
+	st := ds.snapshotLocked()
+	ds.mu.Unlock()
+
+	if ds.broadcaster != nil {
+		ds.broadcaster("download_status", st)
+	}
 }
 
 // SetBroadcaster sets an optional callback for broadcasting log entries.
@@ -119,14 +135,25 @@ func (ds *DownloadState) GetMessages() ([]ScannedMessage, string) {
 	return msgs, ds.scannedAt
 }
 
-// MarkDownloaded sets Exists=true for a specific channel+message combination.
+// MarkDownloaded sets Exists=true for a specific channel+message combination
+// and broadcasts the updated messages via WebSocket.
 func (ds *DownloadState) MarkDownloaded(channel string, msgID int) {
 	ds.mu.Lock()
-	defer ds.mu.Unlock()
 	for i := range ds.messages {
 		if ds.messages[i].Channel == channel && ds.messages[i].MsgID == msgID {
 			ds.messages[i].Exists = true
 			break
 		}
+	}
+	msgs := make([]ScannedMessage, len(ds.messages))
+	copy(msgs, ds.messages)
+	sa := ds.scannedAt
+	ds.mu.Unlock()
+
+	if ds.broadcaster != nil {
+		ds.broadcaster("scan_result", map[string]interface{}{
+			"messages":   msgs,
+			"scanned_at": sa,
+		})
 	}
 }

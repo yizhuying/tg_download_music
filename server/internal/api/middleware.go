@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 
+	"tg-music/internal/response"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,9 +32,35 @@ func authMiddleware() gin.HandlerFunc {
 		}
 		pwd := c.GetHeader("X-Admin-Password")
 		if pwd == "" || pwd != expected {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			response.BadRequest(c, "unauthorized")
 			c.Abort()
 			return
+		}
+		c.Next()
+	}
+}
+
+func (s *Server) requireTelegramClient() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if s.tgClient == nil {
+			if err := s.ensureTelegramClient(); err != nil {
+				response.BadRequest(c, "客户端未建立连接，请先完成 Telegram 认证")
+				c.Abort()
+				return
+			}
+		}
+		c.Next()
+	}
+}
+
+func (s *Server) initTelegramClient() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if s.tgClient == nil {
+			if err := s.ensureTelegramClient(); err != nil {
+				response.ServerError(c, err.Error())
+				c.Abort()
+				return
+			}
 		}
 		c.Next()
 	}

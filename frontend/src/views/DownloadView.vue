@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import {ref, onMounted, onUnmounted} from 'vue'
 import {
   getDownloadStatus, startDownload, stopDownload, scanChannels,
   getDownloadList, downloadSingle, quickTest,
   setAdminPassword, getAdminPassword,
+  type DownloadStatus, type DownloadList,
 } from '../api/http'
-import { connect, onMessage, disconnect } from '../api/ws'
+import {connect, onMessage, disconnect} from '../api/ws'
 
-const showLogin = ref(!getAdminPassword())
+const savedPwd = getAdminPassword() || sessionStorage.getItem('tg_admin_pwd') || ''
+if (savedPwd) setAdminPassword(savedPwd)
+const showLogin = ref(!savedPwd)
 const loginPassword = ref('')
 const loginError = ref('')
 
@@ -26,10 +29,10 @@ interface ScannedFile {
   file_size: number
   exists: boolean
 }
+
 const messages = ref<ScannedFile[]>([])
 const searchInput = ref('')
 const filterHideDownloaded = ref(false)
-const toastMsg = ref('')
 
 function doLogin() {
   if (!loginPassword.value) { loginError.value = '请输入密码'; return }
@@ -40,13 +43,13 @@ function doLogin() {
     .catch(() => { loginError.value = '密码错误' })
 }
 
-function initPage(data: any) {
+function initPage(data: DownloadStatus) {
   running.value = data.running
   totalDownloaded.value = data.total_downloaded
   startedAt.value = data.started_at || '-'
   logs.value = data.logs || []
 
-  connect((snapshot: any) => {
+  connect((snapshot: DownloadStatus) => {
     running.value = snapshot.running
     totalDownloaded.value = snapshot.total_downloaded
     currentChannel.value = snapshot.current_channel || '-'
@@ -54,12 +57,12 @@ function initPage(data: any) {
     logs.value = snapshot.logs || []
   })
 
-  onMessage((msg: any) => {
+  onMessage((msg: { type: string; payload: { time?: string; message?: string; running?: boolean; total_downloaded?: number; current_channel?: string; messages?: ScannedFile[]; scanned_at?: string } }) => {
     if (msg.type === 'log') {
-      logs.value.push(msg.payload)
+      logs.value.push({ time: msg.payload.time || '', message: msg.payload.message || '' })
     } else if (msg.type === 'download_status') {
-      running.value = msg.payload.running
-      totalDownloaded.value = msg.payload.total_downloaded
+      running.value = !!msg.payload.running
+      totalDownloaded.value = msg.payload.total_downloaded ?? 0
       currentChannel.value = msg.payload.current_channel || '-'
     } else if (msg.type === 'scan_result') {
       messages.value = msg.payload.messages || []
@@ -67,20 +70,28 @@ function initPage(data: any) {
     }
   })
 
-  getDownloadList().then((data: any) => {
+  getDownloadList().then((data: DownloadList) => {
     messages.value = data.messages || []
     if (data.scanned_at) scannedAt.value = data.scanned_at
   })
 }
 
 async function doQuickTest() {
-  await quickTest()
-  const data = await getDownloadStatus()
-  running.value = data.running
+  try {
+    await quickTest()
+    const data = await getDownloadStatus()
+    running.value = data.running
+  } catch {
+    // error shown by interceptor
+  }
 }
 
 async function doScan() {
-  await scanChannels()
+  try {
+    await scanChannels()
+  } catch {
+    // error shown by interceptor
+  }
 }
 
 async function doStop() {
@@ -90,9 +101,13 @@ async function doStop() {
 }
 
 async function doStartAll() {
-  await startDownload()
-  const data = await getDownloadStatus()
-  running.value = data.running
+  try {
+    await startDownload()
+    const data = await getDownloadStatus()
+    running.value = data.running
+  } catch {
+    // error shown by interceptor
+  }
 }
 
 async function doDownloadSingle(ch: string, msgId: number) {
@@ -105,7 +120,10 @@ function formatSize(bytes: number): string {
   if (!bytes) return '0B'
   const units = ['B', 'KB', 'MB', 'GB']
   let i = 0, s = bytes
-  while (s >= 1024 && i < units.length - 1) { s /= 1024; i++ }
+  while (s >= 1024 && i < units.length - 1) {
+    s /= 1024;
+    i++
+  }
   return s.toFixed(1) + units[i]
 }
 
@@ -122,10 +140,14 @@ function applyFilters() {
 }
 
 onMounted(async () => {
-  getDownloadStatus().then(initPage).catch(() => { showLogin.value = true })
+  if (getAdminPassword()) {
+    getDownloadStatus().then(initPage).catch(() => { showLogin.value = true })
+  }
 })
 
-onUnmounted(() => { disconnect() })
+onUnmounted(() => {
+  disconnect()
+})
 </script>
 
 <template>
@@ -210,7 +232,5 @@ onUnmounted(() => { disconnect() })
         </div>
       </div>
     </div>
-
-    <div class="toast" :class="{ show: toastMsg || loginError }">{{ toastMsg || loginError }}</div>
   </div>
 </template>

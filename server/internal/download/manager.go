@@ -31,7 +31,6 @@ type Broadcaster interface {
 type ConfigProvider interface {
 	GetChannels() ([]string, string)
 	ConfigDir() string
-	ResolveDebugInfo() map[string]string
 }
 
 // Manager orchestrates channel scanning and audio downloading.
@@ -148,6 +147,27 @@ func (m *Manager) resolveChannelInput(ctx context.Context, channel string) (*tg.
 	return ch, input, nil
 }
 
+const readyTimeout = 60 * time.Second
+
+func (m *Manager) finish() {
+	m.mu.Lock()
+	m.cancel = nil
+	m.mu.Unlock()
+	m.state.SetRunning(false, "")
+}
+
+func (m *Manager) waitReady(ctx context.Context) error {
+	readyCtx, cancel := context.WithTimeout(ctx, readyTimeout)
+	defer cancel()
+	return m.client.WaitReady(readyCtx)
+}
+
+func (m *Manager) afterDownloadSuccess(channel string, msgID int, fileName string) {
+	m.record.Add(channel, msgID, fileName)
+	m.state.MarkDownloaded(channel, msgID)
+	m.state.IncrementDownloaded()
+}
+
 // Start begins a batch download of all configured channels.
 func (m *Manager) Start(ctx context.Context) error {
 	m.mu.Lock()
@@ -164,14 +184,9 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.state.AddLog("开始下载任务")
 
 	go func() {
-		defer func() {
-			m.mu.Lock()
-			m.cancel = nil
-			m.mu.Unlock()
-			m.state.SetRunning(false, "")
-		}()
+		defer m.finish()
 
-		if err := m.client.WaitReady(ctx); err != nil {
+		if err := m.waitReady(ctx); err != nil {
 			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
 			return
 		}
@@ -180,12 +195,12 @@ func (m *Manager) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
+				m.state.AddLog("下载任务已手动停止")
 				return
 			default:
 			}
 
 			channels, downloadDir := m.config.GetChannels()
-			m.state.AddLog(fmt.Sprintf("获取下载目录: %s", downloadDir))
 
 			var next string
 			for _, ch := range channels {
@@ -204,7 +219,7 @@ func (m *Manager) Start(ctx context.Context) error {
 			m.state.AddLog(fmt.Sprintf("开始处理频道: %s", next))
 
 			count, err := m.downloadChannel(ctx, next, downloadDir)
-			if err != nil && ctx.Err() == nil {
+			if err != nil {
 				m.state.AddLog(fmt.Sprintf("频道 %s 下载失败: %v", next, err))
 				continue
 			}
@@ -225,21 +240,23 @@ func (m *Manager) Stop() error {
 		return fmt.Errorf("no download running")
 	}
 	m.cancel()
-	m.state.AddLog("下载任务已手动停止")
 	return nil
 }
 
 // ScanChannels starts background scanning of channels for audio messages.
 func (m *Manager) ScanChannels(ctx context.Context, channels []string, downloadDir string) error {
 	go func() {
-		ctx := context.Background()
-		if err := m.client.WaitReady(ctx); err != nil {
+		readyCtx, readyCancel := context.WithTimeout(context.Background(), readyTimeout)
+		defer readyCancel()
+		if err := m.client.WaitReady(readyCtx); err != nil {
 			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
 			return
 		}
+		scanCtx, scanCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer scanCancel()
 		for _, ch := range channels {
 			m.state.AddLog(fmt.Sprintf("扫描频道: %s", ch))
-			msgs, err := m.scanChannel(ctx, ch, downloadDir)
+			msgs, err := m.scanChannel(scanCtx, ch, downloadDir)
 			if err != nil {
 				m.state.AddLog(fmt.Sprintf("扫描频道 %s 失败: %v", ch, err))
 				continue
@@ -275,14 +292,9 @@ func (m *Manager) DownloadSingle(ctx context.Context, channel, dir string, msgID
 	m.state.SetRunning(true, channel)
 
 	go func() {
-		defer func() {
-			m.mu.Lock()
-			m.cancel = nil
-			m.mu.Unlock()
-			m.state.SetRunning(false, "")
-		}()
+		defer m.finish()
 
-		if err := m.client.WaitReady(ctx); err != nil {
+		if err := m.waitReady(ctx); err != nil {
 			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
 			return
 		}
@@ -312,38 +324,29 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 	m.mu.Unlock()
 
 	m.state.SetRunning(true, channel)
-	m.state.AddLog(fmt.Sprintf("测试频道: %s", channel))
-	debugInfo := m.config.ResolveDebugInfo()
-	m.state.AddLog(fmt.Sprintf("[调试] cfg_download_dir=%s, accessible_paths=%s, env=%s, resolved=%s",
-		debugInfo["cfg_download_dir"], debugInfo["accessible_paths"], debugInfo["env_accessible"], debugInfo["resolved"]))
-	m.state.AddLog(fmt.Sprintf("下载目录: %s", dir))
-	m.state.AddLog("获取第一条音频...")
+	m.state.AddLog(fmt.Sprintf("快速测试频道: %s", channel))
+	m.state.AddLog("获取音频...")
 
 	go func() {
-		defer func() {
-			m.mu.Lock()
-			m.cancel = nil
-			m.mu.Unlock()
-			m.state.SetRunning(false, "")
-		}()
+		defer m.finish()
 
-		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-
-		if err := m.client.WaitReady(ctx); err != nil {
+		if err := m.waitReady(ctx); err != nil {
 			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
 			return
 		}
 
-		_, peer, err := m.resolveChannel(ctx, channel)
+		dlCtx, dlCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer dlCancel()
+
+		_, peer, err := m.resolveChannel(dlCtx, channel)
 		if err != nil {
 			m.state.AddLog(fmt.Sprintf("频道不存在: %v", err))
 			return
 		}
 
-		m.state.AddLog(fmt.Sprintf("正在获取消息历史 (Peer: %T)...", peer))
+		m.state.AddLog("正在获取消息历史...")
 
-		messages, err := m.client.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
+		messages, err := m.client.API().MessagesGetHistory(dlCtx, &tg.MessagesGetHistoryRequest{
 			Peer:  peer,
 			Limit: 20,
 		})
@@ -352,7 +355,7 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 			return
 		}
 
-		m.state.AddLog(fmt.Sprintf("获取到消息类型: %T", messages))
+		//m.state.AddLog(fmt.Sprintf("获取到消息类型: %T", messages))
 
 		var messagesList []tg.MessageClass
 		switch v := messages.(type) {
@@ -373,24 +376,24 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 				continue
 			}
 
-			m.state.AddLog(fmt.Sprintf("找到音频，消息ID: %d", msgMsg.ID))
-			success, err := m.downloadMessage(ctx, channel, dir, msgMsg.ID)
-			if err != nil {
-				if ctx.Err() != nil {
-					m.state.AddLog("下载已停止")
-					return
-				}
+			m.state.AddLog(fmt.Sprintf("找到音频: %s", sanitizeFilename(docFileName(doc))))
+			saveName := sanitizeFilename(docFileName(doc))
+			dirPath := filepath.Join(dir, sanitizeFilename(channel))
+			if err := os.MkdirAll(dirPath, 0o755); err != nil {
+				m.state.AddLog(fmt.Sprintf("创建目录失败: %v", err))
+				return
+			}
+			savePath := filepath.Join(dirPath, saveName)
+			if err := m.downloadDocument(dlCtx, doc, savePath); err != nil {
 				m.state.AddLog(fmt.Sprintf("下载错误: %v", err))
-			} else if success {
-				m.afterDownloadSuccess(channel, msgMsg.ID, "")
-				m.state.AddLog("快速测试完成，请检查下载目录")
 			} else {
-				m.state.AddLog("下载失败")
+				m.afterDownloadSuccess(channel, msgMsg.ID, saveName)
+				m.state.AddLog("快速测试完成，请检查下载目录")
 			}
 			return
 		}
 
-		m.state.AddLog("最近20条消息没有音频")
+		m.state.AddLog("最近20条消息没有音频，请更换频道")
 	}()
 
 	return nil
@@ -457,7 +460,7 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 			if !ok || !isAudio(doc) {
 				continue
 			}
-			saveName := fmt.Sprintf("%d_%s", msgMsg.ID, sanitizeFilename(docFileName(doc)))
+			saveName := sanitizeFilename(docFileName(doc))
 			savePath := filepath.Join(dirPath, saveName)
 			if m.record.Exists(channel, msgMsg.ID) {
 				m.state.AddLog(fmt.Sprintf("文件已下载，跳过: %s", saveName))
@@ -587,12 +590,6 @@ func (m *Manager) downloadMessage(ctx context.Context, channel, dir string, msgI
 	return true, m.downloadDocument(ctx, doc, savePath)
 }
 
-func (m *Manager) afterDownloadSuccess(channel string, msgID int, fileName string) {
-	m.record.Add(channel, msgID, fileName)
-	m.state.MarkDownloaded(channel, msgID)
-	m.state.IncrementDownloaded()
-}
-
 const maxDownloadRetries = 3
 
 func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePath string) error {
@@ -602,11 +599,31 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 		FileReference: doc.FileReference,
 	}
 
-	file, err := os.Create(savePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+	var lastErr error
+	for i := 1; i <= maxDownloadRetries; i++ {
+		file, err := os.Create(savePath)
+		if err != nil {
+			return err
+		}
 
-	return m.client.DownloadToFile(ctx, location, "", file)
+		dlCtx, dlCancel := context.WithTimeout(ctx, 10*time.Minute)
+		err = m.client.DownloadToFile(dlCtx, location, "", file)
+		dlCancel()
+		file.Close()
+
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		os.Remove(savePath)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if i < maxDownloadRetries {
+			m.state.AddLog(fmt.Sprintf("下载重试 %d/%d: %v", i, maxDownloadRetries, err))
+			time.Sleep(time.Duration(i*2) * time.Second)
+		}
+	}
+	return fmt.Errorf("下载失败，重试 %d 次后仍出错: %w", maxDownloadRetries, lastErr)
 }

@@ -69,7 +69,7 @@ func (s *Server) ensureTelegramClient() error {
 	}
 	cfg := s.config.Get()
 	if cfg.APIID == 0 || cfg.APIHash == "" {
-		return fmt.Errorf("telegram API not configured")
+		return fmt.Errorf("telegram API未配置，请先在设置中填写相关信息")
 	}
 
 	client, err := telegram.NewClient(context.Background(), telegram.AppConfig{
@@ -116,25 +116,27 @@ func (s *Server) registerRoutes() {
 	api := s.router.Group("/api")
 	api.Use(authMiddleware())
 
+	api.GET("/system/info", s.getSystemInfo)
+
 	api.GET("/config", s.getConfig)
 	api.POST("/config", s.saveConfig)
 	api.POST("/config/proxy/test", s.testProxy)
 
-	// Auth routes
 	api.GET("/auth/status", s.getAuthStatus)
-	api.POST("/auth/send_code", s.sendCode)
-	api.POST("/auth/sign_in", s.signIn)
+	api.POST("/auth/send_code", s.initTelegramClient(), s.sendCode)
+	api.POST("/auth/sign_in", s.requireTelegramClient(), s.signIn)
 	api.POST("/auth/logout", s.logout)
 
-	// Download routes
-	api.GET("/download/status", s.getDownloadStatus)
-	api.POST("/download/start", s.startDownload)
-	api.POST("/download/stop", s.stopDownload)
-	api.POST("/download/scan", s.scanChannels)
-	api.GET("/download/list", s.getDownloadList)
-	api.POST("/download/single", s.downloadSingle)
-	api.POST("/download/quick_test", s.quickTest)
-	api.GET("/download/dirs", s.listDirs)
+	task := api.Group("/task")
+	task.GET("/status", s.getDownloadStatus)
+	task.GET("/list", s.getDownloadList)
+	task.GET("/dirs", s.listDirs)
+	task.Use(s.requireTelegramClient())
+	task.POST("/start", s.startDownload)
+	task.POST("/stop", s.stopDownload)
+	task.POST("/scan", s.scanChannels)
+	task.POST("/single", s.downloadSingle)
+	task.POST("/quick_test", s.quickTest)
 
 	// Serve static assets (for CGI / standalone mode)
 	s.registerStaticRoutes()
@@ -157,6 +159,17 @@ func (s *Server) registerStaticRoutes() {
 			c.Status(http.StatusNotFound)
 		}
 	})
+
+	for _, name := range []string{"favicon.png", "icon-256.png"} {
+		p := name
+		s.router.GET("/"+p, func(c *gin.Context) {
+			if file, err := fs.ReadFile(s.webFS, p); err == nil {
+				c.Data(http.StatusOK, s.mimeFor(p), file)
+			} else {
+				c.Status(http.StatusNotFound)
+			}
+		})
+	}
 
 	s.router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)

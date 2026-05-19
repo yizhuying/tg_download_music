@@ -1,9 +1,7 @@
-import axios from 'axios'
+import {http, unwrap, type ApiResponse, type Config, type AuthStatus, type DownloadStatus, type DownloadList} from './response'
 
-const http = axios.create({
-    baseURL: '/api',
-    timeout: 30000,
-})
+export type {Config, AuthStatus, DownloadStatus, DownloadList}
+export type {ScannedFile} from './response'
 
 export function setAdminPassword(pwd: string) {
     http.defaults.headers.common['X-Admin-Password'] = pwd
@@ -18,82 +16,72 @@ export function clearAdminPassword() {
     delete http.defaults.headers.common['X-Admin-Password']
 }
 
-export async function getConfig() {
-    const res = await http.get('/config')
-    return res.data
+export async function getConfig(): Promise<Config> {
+    const res = await http.get<any, ApiResponse<Config>>('/config')
+    return unwrap(res)
 }
 
-export async function saveConfig(data: any) {
-    const res = await http.post('/config', data)
-    return res.data
+export async function saveConfig(data: Partial<Config>): Promise<ApiResponse> {
+    return http.post('/config', data)
 }
 
-export async function getAuthStatus() {
-    const res = await http.get('/auth/status')
-    return res.data
+export async function getAuthStatus(): Promise<AuthStatus> {
+    const res = await http.get<any, ApiResponse<AuthStatus>>('/auth/status')
+    return unwrap(res)
 }
 
-export async function sendCode(phoneNumber: string) {
-    const res = await http.post('/auth/send_code', {phone_number: phoneNumber})
-    return res.data
+export async function sendCode(phoneNumber: string): Promise<ApiResponse> {
+    return http.post('/auth/send_code', {phone_number: phoneNumber})
 }
 
-export async function signIn(phoneCode: string, password?: string) {
-    const res = await http.post('/auth/sign_in', {phone_code: phoneCode, password})
-    return res.data
+export async function signIn(phoneCode: string, password?: string): Promise<ApiResponse<{ need_2fa?: boolean }>> {
+    return http.post('/auth/sign_in', {phone_code: phoneCode, password})
 }
 
-export async function logout() {
-    const res = await http.post('/auth/logout')
-    return res.data
+export async function logout(): Promise<ApiResponse> {
+    return http.post('/auth/logout')
 }
 
-export async function getDownloadStatus() {
-    const res = await http.get('/download/status')
-    return res.data
+export async function getDownloadStatus(): Promise<DownloadStatus> {
+    const res = await http.get<any, ApiResponse<DownloadStatus>>('/task/status')
+    return unwrap(res)
 }
 
-export async function startDownload() {
-    const res = await http.post('/download/start')
-    return res.data
+export async function startDownload(): Promise<ApiResponse> {
+    return http.post('/task/start')
 }
 
-export async function stopDownload() {
-    const res = await http.post('/download/stop')
-    return res.data
+export async function stopDownload(): Promise<ApiResponse> {
+    return http.post('/task/stop')
 }
 
-export async function scanChannels() {
-    const res = await http.post('/download/scan')
-    return res.data
+export async function scanChannels(): Promise<ApiResponse> {
+    return http.post('/task/scan')
 }
 
-export async function getDownloadList() {
-    const res = await http.get('/download/list')
-    return res.data
+export async function getDownloadList(): Promise<DownloadList> {
+    const res = await http.get<any, ApiResponse<DownloadList>>('/task/list')
+    return unwrap(res)
 }
 
-export async function downloadSingle(channel: string, msgId: number) {
-    const res = await http.post('/download/single', {channel, msg_id: msgId})
-    return res.data
+export async function downloadSingle(channel: string, msgId: number): Promise<ApiResponse> {
+    return http.post('/task/single', {channel, msg_id: msgId})
 }
 
-export async function quickTest() {
-    const res = await http.post('/download/quick_test')
-    return res.data
+export async function quickTest(): Promise<ApiResponse> {
+    return http.post('/task/quick_test')
 }
 
-export async function getDirs(path: string) {
-    const res = await http.get('/download/dirs', {params: {path}})
-    return res.data as { parent: string; dirs: { name: string; path: string }[] }
+export async function getDirs(path: string): Promise<string[]> {
+    const res = await http.get<any, ApiResponse<string[]>>('/task/dirs', {params: {path}})
+    return res.data ?? []
 }
 
-export async function getDownloadDirList() {
-    const res = await http.get('/download/dirs')
-    return res.data
+export async function getDownloadDirList(): Promise<Array<{label: string; value: string}>> {
+    const res = await http.get<any, ApiResponse<Array<{label: string; value: string}>>>('/task/dirs')
+    return res.data ?? []
 }
 
-export async function testProxy() {
-    const res = await http.post('/config/proxy/test')
-    return res.data
+export async function testProxy(): Promise<ApiResponse<{ ok: boolean }>> {
+    return http.post('/config/proxy/test')
 }

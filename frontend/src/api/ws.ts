@@ -15,6 +15,14 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
 export function connect(onStateSnapshot?: (payload: any) => void) {
+  if (ws) {
+    ws.onclose = null
+    ws.close()
+  }
+  handlers = []
+  if (reconnectTimer) clearTimeout(reconnectTimer)
+  if (heartbeatTimer) clearInterval(heartbeatTimer)
+
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const url = `${protocol}//${location.host}/api/ws`
 

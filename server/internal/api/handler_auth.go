@@ -2,11 +2,11 @@ package api
 
 import (
 	"context"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"tg-music/internal/response"
 	"tg-music/internal/telegram"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +24,7 @@ func (s *Server) getAuthStatus(c *gin.Context) {
 	_, err := os.Stat(sessionPath)
 	exists := err == nil
 
-	c.JSON(http.StatusOK, gin.H{
+	response.OK(c, gin.H{
 		"authorized":   exists,
 		"phone_number": cfg.PhoneNumber,
 		"needs_2fa":    false,
@@ -36,7 +36,7 @@ func (s *Server) sendCode(c *gin.Context) {
 		PhoneNumber string `json:"phone_number" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请输入手机号"})
+		response.BadRequest(c, "请输入手机号")
 		return
 	}
 
@@ -44,25 +44,19 @@ func (s *Server) sendCode(c *gin.Context) {
 	cfg.PhoneNumber = req.PhoneNumber
 	_ = s.config.Save(cfg)
 
-	if err := s.ensureTelegramClient(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
 	result, err := s.tgClient.SendCode(context.Background(), req.PhoneNumber)
 	if err != nil {
-		// AUTH_RESTART means we need to retry after resetting the client
 		if strings.Contains(err.Error(), "AUTH_RESTART") {
 			s.tgClient = nil
 			s.cancelRunning = nil
 			if err := s.ensureTelegramClient(); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				response.ServerError(c, err.Error())
 				return
 			}
 			result, err = s.tgClient.SendCode(context.Background(), req.PhoneNumber)
 		}
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			response.BadRequest(c, err.Error())
 			return
 		}
 	}
@@ -74,20 +68,17 @@ func (s *Server) sendCode(c *gin.Context) {
 	}
 	s.authStateMu.Unlock()
 
-	c.JSON(http.StatusOK, gin.H{
-		"ok":              true,
-		"message":         "验证码已发送",
-		"phone_code_hash": result.PhoneCodeHash,
-	})
+	response.OKMsgData(c, "验证码已发送", gin.H{"phone_code_hash": result.PhoneCodeHash})
 }
 
+// signIn handles the sign-in process using the phone code and optional password for 2FA.
 func (s *Server) signIn(c *gin.Context) {
 	var req struct {
 		PhoneCode string `json:"phone_code" binding:"required"`
 		Password  string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请输入验证码"})
+		response.BadRequest(c, "请输入验证码")
 		return
 	}
 
@@ -96,29 +87,24 @@ func (s *Server) signIn(c *gin.Context) {
 	s.authStateMu.Unlock()
 
 	if state.PhoneCodeHash == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请先发送验证码"})
-		return
-	}
-
-	if err := s.ensureTelegramClient(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.BadRequest(c, "请先发送验证码")
 		return
 	}
 
 	var result *telegram.SignInResult
-	var err error
+	var signinErr error
 	if req.Password != "" {
-		result, err = s.tgClient.SignInWithPassword(context.Background(), state.PhoneNumber, req.PhoneCode, state.PhoneCodeHash, req.Password)
+		result, signinErr = s.tgClient.SignInWithPassword(context.Background(), state.PhoneNumber, req.PhoneCode, state.PhoneCodeHash, req.Password)
 	} else {
-		result, err = s.tgClient.SignIn(context.Background(), state.PhoneNumber, req.PhoneCode, state.PhoneCodeHash)
+		result, signinErr = s.tgClient.SignIn(context.Background(), state.PhoneNumber, req.PhoneCode, state.PhoneCodeHash)
 	}
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if signinErr != nil {
+		response.BadRequest(c, signinErr.Error())
 		return
 	}
 
 	if result.Need2FA {
-		c.JSON(http.StatusOK, gin.H{"need_2fa": true, "message": "需要输入两步验证密码"})
+		response.OKMsgData(c, "需要输入两步验证密码", gin.H{"need_2fa": true})
 		return
 	}
 
@@ -126,11 +112,11 @@ func (s *Server) signIn(c *gin.Context) {
 		s.authStateMu.Lock()
 		s.authState = AuthState{}
 		s.authStateMu.Unlock()
-		c.JSON(http.StatusOK, gin.H{"ok": true, "message": "登录成功"})
+		response.OKMsg(c, "登录成功")
 		return
 	}
 
-	c.JSON(http.StatusBadRequest, gin.H{"error": "登录失败"})
+	response.BadRequest(c, "登录失败")
 }
 
 func (s *Server) logout(c *gin.Context) {
@@ -149,5 +135,5 @@ func (s *Server) logout(c *gin.Context) {
 	sessionPath := filepath.Join(cfg.SessionDir, cfg.SessionName+".json")
 	_ = os.Remove(sessionPath)
 
-	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "已退出登录"})
+	response.OKMsg(c, "已退出登录")
 }

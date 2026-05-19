@@ -2,7 +2,8 @@
 import {ref, onMounted} from 'vue'
 import {
   getConfig, saveConfig, getAuthStatus, sendCode, signIn, logout,
-  setAdminPassword, getAdminPassword, startDownload, getDirs, getDownloadDirList, testProxy
+  setAdminPassword, getAdminPassword, clearAdminPassword, startDownload, getDownloadDirList, testProxy,
+  type Config, type AuthStatus,
 } from '../api/http'
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -10,11 +11,13 @@ import {Lock, Unlock} from '@element-plus/icons-vue'
 
 const router = useRouter()
 
-const password = ref(getAdminPassword() || '')
-const showLogin = ref(!getAdminPassword())
+const savedPwd = getAdminPassword() || sessionStorage.getItem('tg_admin_pwd') || ''
+if (savedPwd) setAdminPassword(savedPwd)
+const password = ref(savedPwd)
+const showLogin = ref(!savedPwd)
 const loginError = ref('')
 
-const apiId = ref(0)
+const apiId = ref()
 const apiHash = ref('')
 const sessionName = ref('my_session')
 const proxyScheme = ref('none')
@@ -34,16 +37,16 @@ const authCode = ref('')
 const show2FA = ref(false)
 const auth2FA = ref('')
 
-const pickerDirs = ref<Array<{path: string, label: string}>>([])
+const pickerDirs = ref<Array<{label: string; value: string}>>([])
 const pickerLoading = ref(false)
 const proxyLoading = ref(false)
 
 async function loadDirOptions() {
   try {
     const data = await getDownloadDirList()
-    pickerDirs.value = Array.isArray(data) ? data : (data.data || [])
-  } catch (e: any) {
-    console.error('loadDirOptions error:', e)
+    pickerDirs.value = Array.isArray(data) ? data : []
+  } catch {
+    // ignore
   }
 }
 
@@ -79,7 +82,7 @@ async function doLogin() {
   }
 }
 
-function fillConfig(data: any) {
+function fillConfig(data: Config) {
   apiId.value = data.api_id || 0
   apiHash.value = data.api_hash || ''
   sessionName.value = data.session_name || 'my_session'
@@ -89,18 +92,8 @@ function fillConfig(data: any) {
   proxyPort.value = p.port || 0
   proxyUsername.value = p.username || ''
   proxyPassword.value = p.password || ''
+  downloadDir.value = data.download_dir || ''
   channels.value = data.channels || []
-
-  const dirs: Array<{path: string, label: string}> = data.accessible_dirs || []
-  if (dirs.length > 0) {
-    pickerDirs.value = dirs
-    const currentPath = data.download_dir || ''
-    const matchDir = dirs.find((d: any) => d.path === currentPath)
-    downloadDir.value = matchDir ? matchDir.path : dirs[0].path
-  } else {
-    pickerDirs.value = [{path: '', label: 'TuneGram/music'}]
-    downloadDir.value = data.download_dir || ''
-  }
 }
 
 async function loadAuthStatus() {
@@ -123,34 +116,34 @@ async function doSendCode() {
     await sendCode(authPhone.value)
     showCodeSection.value = true
     showToast('验证码已发送')
-  } catch (e: any) {
-    showError(e.response?.data?.error || '发送失败')
+  } catch {
+    // error shown by interceptor
   }
 }
 
 async function doSignIn() {
   if (!authCode.value) return
   try {
-    const data = await signIn(authCode.value)
-    if (data.need_2fa) {
+    const res = await signIn(authCode.value)
+    if (res.data?.need_2fa) {
       show2FA.value = true
     } else {
-      showToast(data.message)
+      showToast(res.message || '登录成功')
       await loadAuthStatus()
     }
-  } catch (e: any) {
-    showError(e.response?.data?.error || '登录失败')
+  } catch {
+    // error shown by interceptor
   }
 }
 
 async function doSignIn2FA() {
   if (!authCode.value || !auth2FA.value) return
   try {
-    const data = await signIn(authCode.value, auth2FA.value)
-    showToast(data.message)
+    await signIn(authCode.value, auth2FA.value)
+    showToast('登录成功')
     await loadAuthStatus()
-  } catch (e: any) {
-    showError(e.response?.data?.error || '登录失败')
+  } catch {
+    // error shown by interceptor
   }
 }
 
@@ -170,8 +163,8 @@ async function doLogout() {
     authLoggedIn.value = false
     showCodeSection.value = false
     show2FA.value = false
-  } catch (e: any) {
-    showError(e.response?.data?.error || '退出失败')
+  } catch {
+    // error shown by interceptor
   }
 }
 
@@ -200,27 +193,23 @@ async function doSaveConfig() {
   }
   try {
     const res = await saveConfig(data)
-    showToast(res.message)
+    showToast(res.message || '配置已保存')
   } catch {
-    showToast('保存失败')
+    // error shown by interceptor
   }
 }
 
 async function doTestProxy() {
-  if (proxyScheme.value === 'none') {
-    showToast('代理未配置')
-    return
-  }
   proxyLoading.value = true
   try {
-    const data = await testProxy()
-    if (data.ok) {
-      showToast(data.message)
+    const res = await testProxy()
+    if (res.data?.ok) {
+      showToast(res.message || '代理可用')
     } else {
-      showError(data.message)
+      showError(res.message || '代理不可用')
     }
-  } catch (e: any) {
-    showError(e.response?.data?.error || '测试失败')
+  } catch {
+    // error shown by interceptor
   } finally {
     proxyLoading.value = false
   }
@@ -230,17 +219,13 @@ async function doStartDownload() {
   try {
     await startDownload()
     await router.push('/download')
-  } catch (e: any) {
-    showToast(e.response?.data?.error || '启动失败')
+  } catch {
+    // error shown by interceptor
   }
 }
 
 const showChannelInput = ref(false)
 const newChannel = ref('')
-
-function addChannel() {
-  channels.value.push('')
-}
 
 function confirmAddChannel() {
   if (newChannel.value.trim()) {
@@ -255,7 +240,11 @@ function removeChannel(i: number) {
 }
 
 onMounted(() => {
-  getConfig().then(fillConfig).then(loadAuthStatus).catch(() => {})
+  if (getAdminPassword()) {
+    getConfig().then(fillConfig).then(loadAuthStatus).then(loadDirOptions).catch(() => {
+      showLogin.value = true
+    })
+  }
 })
 </script>
 
@@ -266,7 +255,6 @@ onMounted(() => {
         <h2>管理登录</h2>
         <div class="form-group">
           <label>密码</label>
-
           <el-input v-model="password" type="password" show-password
                     placeholder="输入管理密码" @keydown.enter="doLogin">
             <template #password-icon="{ visible }">
@@ -283,7 +271,6 @@ onMounted(() => {
     </div>
 
     <div v-if="!showLogin">
-
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <h2>API 凭证</h2>
@@ -292,11 +279,11 @@ onMounted(() => {
         <div class="api_cert">
           <div class="form-group">
             <label>API ID <span class="required">*</span></label>
-            <el-input type="text" v-model.number="apiId"/>
+            <el-input type="text" v-model.number="apiId" placeholder="12345678"/>
           </div>
           <div class="form-group">
             <label>API Hash <span class="required">*</span></label>
-            <el-input v-model="apiHash" type="password" show-password>
+            <el-input v-model="apiHash" type="password" placeholder="API Hash" show-password>
               <template #password-icon="{ visible }">
                 <el-icon :size="16">
                   <Unlock v-if="visible"/>
@@ -315,7 +302,7 @@ onMounted(() => {
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <h2>代理配置</h2>
-          <el-button :loading="proxyLoading" :disabled="proxyLoading"
+          <el-button v-if="proxyScheme !== 'none'" :loading="proxyLoading" :disabled="proxyLoading"
                      style="background-color:#76BCF0FF;color:#fff"
                      @click="doTestProxy">测试代理
           </el-button>
@@ -371,10 +358,10 @@ onMounted(() => {
       </div>
 
       <div class="card">
-        <h2>存储路径</h2>
+        <h2 class="required">存储路径</h2>
         <el-select v-model="downloadDir" placeholder="选择下载目录" :loading="pickerLoading"
                    style="width: 100%" @visible-change="onDirSelectVisible">
-          <el-option v-for="d in pickerDirs" :key="d.path" :label="d.label" :value="d.path"/>
+          <el-option v-for="d in pickerDirs" :key="d.value" :label="d.label" :value="d.value"/>
         </el-select>
       </div>
 
@@ -385,7 +372,7 @@ onMounted(() => {
           <div class="form-row" style="align-items: flex-end; gap: 4px">
             <div class="form-group" style="flex: none">
               <label>手机号</label>
-              <el-input style="width: 140px" type="text" v-model="authPhone" placeholder="+8613800138000"/>
+              <el-input style="width: 140px" type="text" v-model="authPhone" placeholder="+86 13800138000"/>
             </div>
             <div class="form-group" style="flex: none">
               <el-button type="primary" :disabled="!authPhone" @click="doSendCode">发送验证码</el-button>
@@ -425,8 +412,6 @@ onMounted(() => {
           </div>
         </div>
       </div>
-
-
     </div>
   </div>
 </template>
