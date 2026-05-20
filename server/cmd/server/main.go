@@ -9,8 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"tg-music/internal/api"
-	"tg-music/internal/config"
+
+	"github.com/yizhuying/tg-music/internal/api"
+	"github.com/yizhuying/tg-music/internal/config"
 )
 
 //go:embed dist/*

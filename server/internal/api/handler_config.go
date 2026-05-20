@@ -7,8 +7,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/proxy"
 
-	"tg-music/internal/config"
-	"tg-music/internal/response"
+	"github.com/yizhuying/tg-music/internal/config"
+	"github.com/yizhuying/tg-music/internal/response"
 
 	"github.com/gin-gonic/gin"
 )

@@ -3,7 +3,7 @@ package api
 import (
 	"runtime"
 
-	"tg-music/internal/response"
+	"github.com/yizhuying/tg-music/internal/response"
 
 	"github.com/gin-gonic/gin"
 )

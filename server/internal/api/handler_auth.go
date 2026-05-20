@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"tg-music/internal/response"
-	"tg-music/internal/telegram"
+	"github.com/yizhuying/tg-music/internal/response"
+	"github.com/yizhuying/tg-music/internal/telegram"
 
 	"github.com/gin-gonic/gin"
 )

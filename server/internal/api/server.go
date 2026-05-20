@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"os"
 	"sync"
-	"tg-music/internal/config"
-	"tg-music/internal/download"
-	"tg-music/internal/telegram"
+
+	"github.com/yizhuying/tg-music/internal/config"
+	"github.com/yizhuying/tg-music/internal/download"
+	"github.com/yizhuying/tg-music/internal/telegram"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
