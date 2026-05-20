@@ -4,11 +4,11 @@
 
 ## 技术栈
 
-| 层 | 技术 |
-|---|------|
-| 后端 | Go 1.25 + Gin + gotd/td (MTProto) |
+| 层  | 技术                                       |
+|----|------------------------------------------|
+| 后端 | Go 1.25 + Gin + gotd/td (MTProto)        |
 | 前端 | Vue 3 + TypeScript + Vite + Element Plus |
-| 通信 | REST API + WebSocket 实时推送 |
+| 通信 | REST API + WebSocket 实时推送                |
 
 ## 项目结构
 
@@ -84,16 +84,17 @@ make fnos
 
 ## 启动参数
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `-port` | `45116` | HTTP 监听端口 |
-| `-config` | `config.json` | 配置文件路径 |
-| `-download-dir` | `./downloads` | 覆盖下载目录 |
-| `-session-dir` | `./sessions` | 覆盖 session 存储目录 |
-| `-socket` | 空 | Unix Socket 路径（网关模式） |
-| `-admin-password` | `admin` | 管理密码 |
+| 参数                | 默认值           | 说明                   |
+|-------------------|---------------|----------------------|
+| `-port`           | `45116`       | HTTP 监听端口            |
+| `-config`         | `config.json` | 配置文件路径               |
+| `-download-dir`   | `./downloads` | 覆盖下载目录               |
+| `-session-dir`    | `./sessions`  | 覆盖 session 存储目录      |
+| `-socket`         | 空             | Unix Socket 路径（网关模式） |
+| `-admin-password` | `admin`       | 管理密码                 |
 
 环境变量：
+
 - `ADMIN_PASSWORD`：管理密码（命令行参数优先）
 - `TRIM_DATA_ACCESSIBLE_PATHS`：fnOS 可写路径（冒号分隔）
 
@@ -104,7 +105,11 @@ make fnos
   "api_id": 0,
   "api_hash": "",
   "session_name": "my_session",
-  "channels": ["VmoMusic", "FLAC_HR", "cjCoolMusic"],
+  "channels": [
+    "VmoMusic",
+    "FLAC_HR",
+    "cjCoolMusic"
+  ],
   "proxy": {
     "scheme": "socks5",
     "hostname": "",
@@ -126,33 +131,39 @@ make fnos
 
 ### 认证
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/auth/status` | 查询认证状态 |
-| POST | `/api/auth/send_code` | 发送验证码 |
-| POST | `/api/auth/sign_in` | 登录（验证码/二次密码） |
-| POST | `/api/auth/logout` | 登出 |
+| 方法   | 路径                    | 说明           |
+|------|-----------------------|--------------|
+| GET  | `/api/auth/status`    | 查询认证状态       |
+| POST | `/api/auth/send_code` | 发送验证码        |
+| POST | `/api/auth/sign_in`   | 登录（验证码/二次密码） |
+| POST | `/api/auth/logout`    | 登出           |
 
 ### 配置
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/config` | 获取当前配置 |
-| POST | `/api/config` | 保存配置 |
+| 方法   | 路径                       | 说明      |
+|------|--------------------------|---------|
+| GET  | `/api/config`            | 获取当前配置  |
+| POST | `/api/config`            | 保存配置    |
 | POST | `/api/config/proxy/test` | 测试代理连通性 |
 
-### 下载
+### 系统
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/download/status` | 下载状态 |
-| POST | `/api/download/start` | 开始全部下载 |
-| POST | `/api/download/stop` | 停止下载 |
-| POST | `/api/download/scan` | 扫描频道音频 |
-| GET | `/api/download/list` | 获取扫描结果列表 |
-| POST | `/api/download/single` | 下载单条消息 |
-| POST | `/api/download/quick_test` | 快速测试（首条音频） |
-| GET | `/api/download/dirs` | 可用目录列表 |
+| 方法  | 路径                 | 说明   |
+|-----|--------------------|------|
+| GET | `/api/system/info` | 系统信息 |
+
+### 任务
+
+| 方法   | 路径                     | 说明         |
+|------|------------------------|------------|
+| GET  | `/api/task/status`     | 下载状态       |
+| GET  | `/api/task/list`       | 获取扫描结果列表   |
+| GET  | `/api/task/dirs`       | 可用目录列表     |
+| POST | `/api/task/start`      | 开始全部下载     |
+| POST | `/api/task/stop`       | 停止下载       |
+| POST | `/api/task/scan`       | 扫描频道音频     |
+| POST | `/api/task/single`     | 下载单条消息     |
+| POST | `/api/task/quick_test` | 快速测试（首条音频） |
 
 ### WebSocket
 
@@ -166,7 +177,7 @@ make fnos
 4. **扫描** → 扫描频道获取音频消息列表
 5. **下载** → 全部下载或选择单条下载
 
-文件保存格式：`{消息ID}_{文件名}`，按频道建子目录。
+文件保存格式：`{频道名}/{文件名}`，按频道建子目录。
 
 ## 支持的音频格式
 
