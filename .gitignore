@@ -1,13 +1,9 @@
-# Python-generated files
-__pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
-
-# Virtual environments
-.venv
+.DS_Store
 
 # Sessions and downloads
 sessions/
@@ -17,9 +13,6 @@ config.json
 # IDE
 .idea/
 .vscode/
-
-# Env
-.env
 
 # Frontend
 web/node_modules/
