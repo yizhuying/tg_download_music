@@ -9,7 +9,6 @@ wheels/
 sessions/
 downloads/
 config.json
-
 # IDE
 .idea/
 .vscode/
