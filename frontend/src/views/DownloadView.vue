@@ -6,6 +6,7 @@ import {
   setAdminPassword, getAdminPassword,
   type DownloadStatus, type DownloadList,
 } from '../api/http'
+import {NInput, NButton, NCheckbox} from 'naive-ui'
 import {connect, onMessage, disconnect} from '../api/ws'
 
 const savedPwd = getAdminPassword() || sessionStorage.getItem('tg_admin_pwd') || ''
@@ -157,11 +158,11 @@ onUnmounted(() => {
         <h2>管理登录</h2>
         <div class="form-group">
           <label>密码</label>
-          <el-input type="password" v-model="loginPassword" placeholder="输入管理密码"
-            @keydown.enter="doLogin" />
+          <n-input type="password" v-model:value="loginPassword" placeholder="输入管理密码"
+                   show-password-on="click" @keydown.enter="doLogin" />
         </div>
         <div class="login-error">{{ loginError }}</div>
-        <el-button class="btn btn-primary" style="width:100%" @click="doLogin">登录</el-button>
+        <n-button type="primary" style="width:100%" @click="doLogin">登录</n-button>
       </div>
     </div>
 
@@ -170,13 +171,13 @@ onUnmounted(() => {
         <h2>下载控制</h2>
         <div class="form-row" style="gap: 4px; align-items: flex-end">
           <div class="form-group" style="flex: none">
-            <el-button type="info" @click="doQuickTest">快速测试</el-button>
+            <n-button type="info" @click="doQuickTest">快速测试</n-button>
           </div>
           <div class="form-group" style="flex: none">
-            <el-button type="warning" @click="doScan">扫描文件列表</el-button>
+            <n-button type="warning" @click="doScan">扫描文件列表</n-button>
           </div>
           <div class="form-group" style="flex: none">
-            <el-button type="success" @click="doStartAll">全部下载</el-button>
+            <n-button type="success" @click="doStartAll">全部下载</n-button>
           </div>
           <div class="form-group">
             <span style="font-size:0.75rem;color:#888">快速测试：自动下载第一个频道的第一条音频，用于验证功能</span>
@@ -192,7 +193,7 @@ onUnmounted(() => {
             <span style="font-size:0.78rem">{{ currentChannel }}</span>
           </div>
           <div class="form-group" style="flex: none">
-            <el-button type="danger" :disabled="!running" @click="doStop">停止下载</el-button>
+            <n-button type="error" :disabled="!running" @click="doStop">停止下载</n-button>
           </div>
           <div class="form-group">
             <span style="font-size:0.75rem;color:#888">已下载: {{ totalDownloaded }} 个 | 开始: {{ startedAt }} | 扫描: {{ scannedAt }}</span>
@@ -204,8 +205,8 @@ onUnmounted(() => {
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:6px">
           <h2>文件列表 <span>({{ filteredMessages.length }}/{{ messages.length }})</span></h2>
           <div style="display:flex;gap:8px;align-items:center">
-            <el-checkbox v-model="filterHideDownloaded" @change="applyFilters">隐藏已下载</el-checkbox>
-            <el-input v-model="searchInput" placeholder="搜索文件名..." @input="applyFilters" style="width:150px"/>
+            <n-checkbox v-model:checked="filterHideDownloaded" @update:checked="applyFilters">隐藏已下载</n-checkbox>
+            <n-input v-model:value="searchInput" placeholder="搜索文件名..." @update:value="applyFilters" style="width:150px" />
           </div>
         </div>
         <div class="file-list">
@@ -216,8 +217,8 @@ onUnmounted(() => {
               <div class="file-name">{{ m.file_name }}</div>
               <div class="file-meta">{{ m.channel_title }} | {{ formatSize(m.file_size) }} {{ m.exists ? '[已下载]' : '' }}</div>
             </div>
-            <el-button v-if="!m.exists" class="btn btn-sm btn-primary"
-              @click="doDownloadSingle(m.channel, m.msg_id)">下载</el-button>
+            <n-button v-if="!m.exists" size="small" type="primary"
+              @click="doDownloadSingle(m.channel, m.msg_id)">下载</n-button>
             <span v-else class="badge badge-done">已完成</span>
           </div>
         </div>

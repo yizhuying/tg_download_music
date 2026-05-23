@@ -2,6 +2,7 @@ package download
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gotd/td/tg"
@@ -220,6 +222,10 @@ func (m *Manager) Start(ctx context.Context) error {
 
 			count, err := m.downloadChannel(ctx, next, downloadDir)
 			if err != nil {
+				if errors.Is(err, syscall.ENOSPC) {
+					m.state.AddLog("磁盘空间不足，停止所有下载任务，请清理磁盘空间后重试")
+					return
+				}
 				m.state.AddLog(fmt.Sprintf("频道 %s 下载失败: %v", next, err))
 				continue
 			}
@@ -385,6 +391,10 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 			}
 			savePath := filepath.Join(dirPath, saveName)
 			if err := m.downloadDocument(dlCtx, doc, savePath); err != nil {
+				if errors.Is(err, syscall.ENOSPC) {
+					m.state.AddLog("磁盘空间不足，下载失败，请清理磁盘空间后重试")
+					return
+				}
 				m.state.AddLog(fmt.Sprintf("下载错误: %v", err))
 			} else {
 				m.afterDownloadSuccess(channel, msgMsg.ID, saveName)
@@ -406,7 +416,7 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 	}
 
 	dirPath := filepath.Join(downloadDir, sanitizeFilename(channel))
-	m.state.AddLog(fmt.Sprintf("创建频道目录: %s", dirPath))
+	m.state.AddLog(fmt.Sprintf("文件下载目录: %s", dirPath))
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
 		return 0, fmt.Errorf("创建目录 %s 失败: %w", dirPath, err)
 	}
@@ -471,6 +481,9 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 			if err := m.downloadDocument(ctx, doc, savePath); err != nil {
 				if ctx.Err() != nil {
 					return count, nil
+				}
+				if errors.Is(err, syscall.ENOSPC) {
+					return count, fmt.Errorf("磁盘空间不足: %w", err)
 				}
 				m.state.AddLog(fmt.Sprintf("下载失败: %v", err))
 				continue
@@ -619,6 +632,9 @@ func (m *Manager) downloadDocument(ctx context.Context, doc *tg.Document, savePa
 		os.Remove(savePath)
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+		if errors.Is(lastErr, syscall.ENOSPC) {
+			return fmt.Errorf("磁盘空间不足: %w", lastErr)
 		}
 		if i < maxDownloadRetries {
 			m.state.AddLog(fmt.Sprintf("下载重试 %d/%d: %v", i, maxDownloadRetries, err))

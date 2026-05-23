@@ -13,6 +13,16 @@ export default defineConfig({
   },
   build: {
     outDir: '../server/cmd/server/dist',
+    emptyOutDir: true,
     assetsDir: 'assets',
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'naive-ui': ['naive-ui'],
+          'vue-vendor': ['vue', 'vue-router'],
+        },
+      },
+    },
   },
 })

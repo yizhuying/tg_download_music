@@ -1,5 +1,7 @@
 import axios, {type AxiosResponse} from 'axios'
-import {ElMessage} from 'element-plus'
+import {createDiscreteApi} from 'naive-ui'
+
+const {message} = createDiscreteApi(['message'])
 
 export interface ApiResponse<T = unknown> {
     code: number
@@ -70,14 +72,14 @@ http.interceptors.response.use(
         const body = res.data as ApiResponse
         if (body.code !== undefined && body.code !== 0) {
             const msg = body.message || '请求失败'
-            ElMessage({message: msg, type: 'error', duration: 3000})
+            message.error(msg, {duration: 3000})
             return Promise.reject(new Error(msg))
         }
         return body as any
     },
     (err) => {
         const msg = err.response?.data?.message || '网络错误'
-        ElMessage({message: msg, type: 'error', duration: 3000})
+        message.error(msg, {duration: 3000})
         return Promise.reject(err)
     }
 )

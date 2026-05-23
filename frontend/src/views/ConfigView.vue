@@ -6,10 +6,11 @@ import {
   type Config, type AuthStatus,
 } from '../api/http'
 import {useRouter} from 'vue-router'
-import {ElMessage, ElMessageBox} from 'element-plus'
-import {Lock, Unlock} from '@element-plus/icons-vue'
+import {useMessage, useDialog, NInput, NButton, NInputNumber, NSelect, NTag} from 'naive-ui'
 
 const router = useRouter()
+const message = useMessage()
+const dialog = useDialog()
 
 const savedPwd = getAdminPassword() || sessionStorage.getItem('tg_admin_pwd') || ''
 if (savedPwd) setAdminPassword(savedPwd)
@@ -17,12 +18,12 @@ const password = ref(savedPwd)
 const showLogin = ref(!savedPwd)
 const loginError = ref('')
 
-const apiId = ref()
+const apiId = ref<number | undefined>()
 const apiHash = ref('')
 const sessionName = ref('my_session')
 const proxyScheme = ref('none')
 const proxyHostname = ref('')
-const proxyPort = ref(0)
+const proxyPort = ref<number | undefined>()
 const proxyUsername = ref('')
 const proxyPassword = ref('')
 const downloadDir = ref('')
@@ -41,6 +42,11 @@ const pickerDirs = ref<Array<{label: string; value: string}>>([])
 const pickerLoading = ref(false)
 const proxyLoading = ref(false)
 
+const proxyOptions = [
+  {label: '无', value: 'none'},
+  {label: 'SOCKS5', value: 'socks5'},
+]
+
 async function loadDirOptions() {
   try {
     const data = await getDownloadDirList()
@@ -57,11 +63,11 @@ async function onDirSelectVisible(visible: boolean) {
 }
 
 function showToast(msg: string) {
-  ElMessage({message: msg, type: 'success', duration: 2000})
+  message.success(msg, {duration: 2000})
 }
 
 function showError(msg: string) {
-  ElMessage({message: msg, type: 'error', duration: 3000})
+  message.error(msg, {duration: 3000})
 }
 
 async function doLogin() {
@@ -147,25 +153,24 @@ async function doSignIn2FA() {
   }
 }
 
-async function doLogout() {
-  try {
-    await ElMessageBox.confirm('确定要退出登录吗？', '确认', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-  try {
-    await logout()
-    showToast('已退出登录')
-    authLoggedIn.value = false
-    showCodeSection.value = false
-    show2FA.value = false
-  } catch {
-    // error shown by interceptor
-  }
+function doLogout() {
+  dialog.warning({
+    title: '确认',
+    content: '确定要退出登录吗？',
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await logout()
+        showToast('已退出登录')
+        authLoggedIn.value = false
+        showCodeSection.value = false
+        show2FA.value = false
+      } catch {
+        // error shown by interceptor
+      }
+    },
+  })
 }
 
 async function doSaveConfig() {
@@ -184,7 +189,7 @@ async function doSaveConfig() {
     proxy: {
       scheme: proxyScheme.value,
       hostname: proxyHostname.value,
-      port: proxyPort.value,
+      port: proxyPort.value || 0,
       username: proxyUsername.value,
       password: proxyPassword.value,
     },
@@ -255,18 +260,11 @@ onMounted(() => {
         <h2>管理登录</h2>
         <div class="form-group">
           <label>密码</label>
-          <el-input v-model="password" type="password" show-password
-                    placeholder="输入管理密码" @keydown.enter="doLogin">
-            <template #password-icon="{ visible }">
-              <el-icon :size="16">
-                <Unlock v-if="visible"/>
-                <Lock v-else/>
-              </el-icon>
-            </template>
-          </el-input>
+          <n-input v-model:value="password" type="password" show-password-on="click"
+                   placeholder="输入管理密码" @keydown.enter="doLogin" />
         </div>
         <div class="login-error">{{ loginError }}</div>
-        <el-button type="primary" style="width:50%" @click="doLogin">登录</el-button>
+        <n-button type="primary" style="width:50%" @click="doLogin">登录</n-button>
       </div>
     </div>
 
@@ -274,27 +272,20 @@ onMounted(() => {
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <h2>API 凭证</h2>
-          <el-button type="primary" @click="doSaveConfig">保存配置</el-button>
+          <n-button type="primary" @click="doSaveConfig">保存配置</n-button>
         </div>
         <div class="api_cert">
           <div class="form-group">
             <label>API ID <span class="required">*</span></label>
-            <el-input type="text" v-model.number="apiId" placeholder="12345678"/>
+            <n-input-number v-model:value="apiId" placeholder="12345678" :show-button="false" style="width:100%" />
           </div>
           <div class="form-group">
             <label>API Hash <span class="required">*</span></label>
-            <el-input v-model="apiHash" type="password" placeholder="API Hash" show-password>
-              <template #password-icon="{ visible }">
-                <el-icon :size="16">
-                  <Unlock v-if="visible"/>
-                  <Lock v-else/>
-                </el-icon>
-              </template>
-            </el-input>
+            <n-input v-model:value="apiHash" type="password" placeholder="API Hash" show-password-on="click" />
           </div>
           <div class="form-group">
             <label>Session 名称</label>
-            <el-input type="text" v-model="sessionName"/>
+            <n-input v-model:value="sessionName" />
           </div>
         </div>
       </div>
@@ -302,45 +293,33 @@ onMounted(() => {
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <h2>代理配置</h2>
-          <el-button v-if="proxyScheme !== 'none'" :loading="proxyLoading" :disabled="proxyLoading"
-                     style="background-color:#76BCF0FF;color:#fff"
-                     @click="doTestProxy">测试代理
-          </el-button>
+          <n-button v-if="proxyScheme !== 'none'" :loading="proxyLoading" :disabled="proxyLoading"
+                    type="info" @click="doTestProxy">测试代理</n-button>
         </div>
         <div class="proxy_settings">
           <div class="form-group">
             <label>代理类型</label>
-            <el-select v-model="proxyScheme" style="width:100%">
-              <el-option value="none">无</el-option>
-              <el-option value="socks5">SOCKS5</el-option>
-            </el-select>
+            <n-select v-model:value="proxyScheme" :options="proxyOptions" />
           </div>
           <div class="form-group">
             <label>主机地址 <span v-if="proxyScheme !== 'none'" class="required">*</span></label>
-            <el-input type="text" v-model="proxyHostname" placeholder="127.0.0.1"
-                      :disabled="proxyScheme === 'none'"/>
+            <n-input v-model:value="proxyHostname" placeholder="127.0.0.1"
+                     :disabled="proxyScheme === 'none'" />
           </div>
           <div class="form-group">
             <label>端口 <span v-if="proxyScheme !== 'none'" class="required">*</span></label>
-            <el-input type="text" v-model.number="proxyPort" placeholder="1080"
-                      :disabled="proxyScheme === 'none'"/>
+            <n-input-number v-model:value="proxyPort" placeholder="1080" :show-button="false"
+                            :disabled="proxyScheme === 'none'" style="width:100%" />
           </div>
           <div class="form-group">
             <label>用户名</label>
-            <el-input type="text" v-model="proxyUsername" placeholder="可选"
-                      :disabled="proxyScheme === 'none'"/>
+            <n-input v-model:value="proxyUsername" placeholder="可选"
+                     :disabled="proxyScheme === 'none'" />
           </div>
           <div class="form-group">
             <label>密码</label>
-            <el-input type="password" v-model="proxyPassword" placeholder="可选" show-password
-                      :disabled="proxyScheme === 'none'">
-              <template #password-icon="{ visible }">
-                <el-icon :size="16">
-                  <Unlock v-if="visible"/>
-                  <Lock v-else/>
-                </el-icon>
-              </template>
-            </el-input>
+            <n-input v-model:value="proxyPassword" type="password" placeholder="可选" show-password-on="click"
+                     :disabled="proxyScheme === 'none'" />
           </div>
         </div>
       </div>
@@ -348,21 +327,19 @@ onMounted(() => {
       <div class="card">
         <h2>频道列表</h2>
         <div class="channel-tags">
-          <el-tag v-for="(ch, i) in channels" :key="i" closable @close="removeChannel(i)" class="channel-tag">
+          <n-tag v-for="(ch, i) in channels" :key="i" closable @close="removeChannel(i)" size="small">
             {{ ch || '未填写' }}
-          </el-tag>
-          <el-input v-if="showChannelInput" v-model="newChannel" size="small" placeholder="输入后回车"
-                    style="width: 120px" @keyup.enter="confirmAddChannel" @blur="confirmAddChannel" autofocus/>
-          <el-button v-else size="small" @click="showChannelInput = true">+ 添加</el-button>
+          </n-tag>
+          <n-input v-if="showChannelInput" v-model:value="newChannel" size="small" placeholder="输入后回车"
+                   style="width: 120px" @keyup.enter="confirmAddChannel" @blur="confirmAddChannel" autofocus />
+          <n-button v-else size="small" @click="showChannelInput = true">+ 添加</n-button>
         </div>
       </div>
 
       <div class="card">
         <h2 class="required">存储路径</h2>
-        <el-select v-model="downloadDir" placeholder="选择下载目录" :loading="pickerLoading"
-                   style="width: 100%" @visible-change="onDirSelectVisible">
-          <el-option v-for="d in pickerDirs" :key="d.value" :label="d.label" :value="d.value"/>
-        </el-select>
+        <n-select v-model:value="downloadDir" :options="pickerDirs" placeholder="选择下载目录"
+                  :loading="pickerLoading" @update:show="onDirSelectVisible" />
       </div>
 
       <div class="card">
@@ -372,34 +349,27 @@ onMounted(() => {
           <div class="form-row" style="align-items: flex-end; gap: 4px">
             <div class="form-group" style="flex: none">
               <label>手机号</label>
-              <el-input style="width: 140px" type="text" v-model="authPhone" placeholder="+86 13800138000"/>
+              <n-input v-model:value="authPhone" style="width: 140px" placeholder="+86 13800138000" />
             </div>
             <div class="form-group" style="flex: none">
-              <el-button type="primary" :disabled="!authPhone" @click="doSendCode">发送验证码</el-button>
+              <n-button type="primary" :disabled="!authPhone" @click="doSendCode">发送验证码</n-button>
             </div>
             <div class="form-group" v-if="showCodeSection" style="flex: none">
               <label>验证码</label>
-              <el-input style="width: 100px" type="text" v-model="authCode" placeholder="验证码"/>
+              <n-input v-model:value="authCode" style="width: 100px" placeholder="验证码" />
             </div>
             <div class="form-group" v-if="showCodeSection" style="flex: none">
-              <el-button type="primary" @click="doSignIn">登录</el-button>
+              <n-button type="primary" @click="doSignIn">登录</n-button>
             </div>
           </div>
           <div v-if="show2FA">
             <div class="form-row" style="align-items: flex-end; gap: 4px; margin-top: 2px">
               <div class="form-group" style="flex: none">
                 <label>两步验证密码</label>
-                <el-input v-model="auth2FA" type="password" show-password style="width: 200px" placeholder="2FA 密码">
-                  <template #password-icon="{ visible }">
-                    <el-icon :size="16">
-                      <Unlock v-if="visible"/>
-                      <Lock v-else/>
-                    </el-icon>
-                  </template>
-                </el-input>
+                <n-input v-model:value="auth2FA" type="password" show-password-on="click" style="width: 200px" placeholder="2FA 密码" />
               </div>
               <div class="form-group" style="flex: none">
-                <el-button type="primary" @click="doSignIn2FA">登录</el-button>
+                <n-button type="primary" @click="doSignIn2FA">登录</n-button>
               </div>
             </div>
           </div>
@@ -408,7 +378,7 @@ onMounted(() => {
           <div class="status-bar">
             <span class="badge running">已登录</span>
             <span>{{ authPhone }}</span>
-            <el-button type="danger" size="small" @click="doLogout">退出登录</el-button>
+            <n-button type="error" size="small" @click="doLogout">退出登录</n-button>
           </div>
         </div>
       </div>
