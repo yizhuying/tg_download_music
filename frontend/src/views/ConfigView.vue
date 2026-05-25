@@ -6,7 +6,7 @@ import {
   type Config, type AuthStatus,
 } from '../api/http'
 import {useRouter} from 'vue-router'
-import {useMessage, useDialog, NInput, NButton, NInputNumber, NSelect, NTag} from 'naive-ui'
+import {useMessage, useDialog, NInput, NButton, NInputNumber, NSelect, NTag, NTimePicker} from 'naive-ui'
 
 const router = useRouter()
 const message = useMessage()
@@ -28,6 +28,8 @@ const proxyUsername = ref('')
 const proxyPassword = ref('')
 const downloadDir = ref('')
 const channels = ref<string[]>([])
+const downloadTimeStart = ref<number | null>(null)
+const downloadTimeEnd = ref<number | null>(null)
 
 const authLoading = ref(true)
 const authLoggedIn = ref(false)
@@ -46,6 +48,21 @@ const proxyOptions = [
   {label: '无', value: 'none'},
   {label: 'SOCKS5', value: 'socks5'},
 ]
+
+function hhmmToTimestamp(hhmm: string): number | null {
+  if (!hhmm) return null
+  const [h, m] = hhmm.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return null
+  const d = new Date()
+  d.setHours(h, m, 0, 0)
+  return d.getTime()
+}
+
+function timestampToHhmm(ts: number | null): string {
+  if (ts == null) return ''
+  const d = new Date(ts)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 async function loadDirOptions() {
   try {
@@ -89,17 +106,19 @@ async function doLogin() {
 }
 
 function fillConfig(data: Config) {
-  apiId.value = data.api_id || 0
+  apiId.value = data.api_id || undefined
   apiHash.value = data.api_hash || ''
   sessionName.value = data.session_name || 'my_session'
   const p = data.proxy || {}
   proxyScheme.value = p.scheme || 'none'
   proxyHostname.value = p.hostname || ''
-  proxyPort.value = p.port || 0
+  proxyPort.value = p.port || undefined
   proxyUsername.value = p.username || ''
   proxyPassword.value = p.password || ''
   downloadDir.value = data.download_dir || ''
   channels.value = data.channels || []
+  downloadTimeStart.value = hhmmToTimestamp(data.download_time_start || '')
+  downloadTimeEnd.value = hhmmToTimestamp(data.download_time_end || '')
 }
 
 async function loadAuthStatus() {
@@ -195,6 +214,8 @@ async function doSaveConfig() {
     },
     channels: channels.value.filter(c => c.trim()),
     download_dir: downloadDir.value,
+    download_time_start: timestampToHhmm(downloadTimeStart.value),
+    download_time_end: timestampToHhmm(downloadTimeEnd.value),
   }
   try {
     const res = await saveConfig(data)
@@ -339,7 +360,31 @@ onMounted(() => {
       <div class="card">
         <h2 class="required">存储路径</h2>
         <n-select v-model:value="downloadDir" :options="pickerDirs" placeholder="选择下载目录"
-                  :loading="pickerLoading" @update:show="onDirSelectVisible" />
+                  :loading="pickerLoading" @update:show="onDirSelectVisible">
+          <template #empty>
+            <span style="font-size:0.8rem;color:#999">暂无可用目录</span>
+          </template>
+        </n-select>
+      </div>
+
+      <div class="card">
+        <h2>下载时间</h2>
+        <p style="font-size:0.78rem;color:#888;margin-bottom:8px">
+          设置允许下载的时间范围，留空表示不限制。支持跨午夜（如 22:00 - 次日 06:00）。
+        </p>
+        <div class="form-row" style="gap: 8px; align-items: center">
+          <div class="form-group" style="flex:none;width:150px">
+            <label>开始时间</label>
+            <n-time-picker v-model:value="downloadTimeStart" format="HH:mm" clearable
+                           placeholder="不限" style="width:100%" />
+          </div>
+          <span style="padding-top:20px">—</span>
+          <div class="form-group" style="flex:none;width:150px">
+            <label>结束时间</label>
+            <n-time-picker v-model:value="downloadTimeEnd" format="HH:mm" clearable
+                           placeholder="不限" style="width:100%" />
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -349,7 +394,7 @@ onMounted(() => {
           <div class="form-row" style="align-items: flex-end; gap: 4px">
             <div class="form-group" style="flex: none">
               <label>手机号</label>
-              <n-input v-model:value="authPhone" style="width: 140px" placeholder="+86 13800138000" />
+              <n-input v-model:value="authPhone" style="width: 160px" placeholder="+86 13800138000" />
             </div>
             <div class="form-group" style="flex: none">
               <n-button type="primary" :disabled="!authPhone" @click="doSendCode">发送验证码</n-button>

@@ -17,14 +17,16 @@ type Proxy struct {
 }
 
 type Config struct {
-	APIID       int      `json:"api_id"`
-	APIHash     string   `json:"api_hash"`
-	SessionName string   `json:"session_name"`
-	Channels    []string `json:"channels"`
-	Proxy       Proxy    `json:"proxy"`
-	DownloadDir string   `json:"download_dir"`
-	SessionDir  string   `json:"session_dir"`
-	PhoneNumber string   `json:"phone_number"`
+	APIID             int      `json:"api_id"`
+	APIHash           string   `json:"api_hash"`
+	SessionName       string   `json:"session_name"`
+	Channels          []string `json:"channels"`
+	Proxy             Proxy    `json:"proxy"`
+	DownloadDir       string   `json:"download_dir"`
+	SessionDir        string   `json:"session_dir"`
+	PhoneNumber       string   `json:"phone_number"`
+	DownloadTimeStart string   `json:"download_time_start"` // "HH:mm" 允许下载的开始时间
+	DownloadTimeEnd   string   `json:"download_time_end"`   // "HH:mm" 允许下载的结束时间
 }
 
 func Defaults() Config {
@@ -61,6 +63,11 @@ func NewManager(configPath string) (*Manager, error) {
 func (m *Manager) GetChannels() ([]string, string) {
 	c := m.Get()
 	return c.Channels, c.DownloadDir
+}
+
+func (m *Manager) GetDownloadTimeRange() (string, string) {
+	c := m.Get()
+	return c.DownloadTimeStart, c.DownloadTimeEnd
 }
 
 func (m *Manager) ConfigDir() string {

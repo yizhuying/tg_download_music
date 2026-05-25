@@ -24,6 +24,8 @@ export interface Config {
     download_dir: string
     session_dir: string
     phone_number: string
+    download_time_start: string
+    download_time_end: string
 }
 
 export interface AuthStatus {

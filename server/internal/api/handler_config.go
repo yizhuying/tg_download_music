@@ -20,12 +20,14 @@ func (s *Server) getConfig(c *gin.Context) {
 
 func (s *Server) saveConfig(c *gin.Context) {
 	var req struct {
-		APIID       int          `json:"api_id"`
-		APIHash     string       `json:"api_hash"`
-		SessionName string       `json:"session_name"`
-		Channels    []string     `json:"channels"`
-		Proxy       config.Proxy `json:"proxy"`
-		DownloadDir string       `json:"download_dir"`
+		APIID             int          `json:"api_id"`
+		APIHash           string       `json:"api_hash"`
+		SessionName       string       `json:"session_name"`
+		Channels          []string     `json:"channels"`
+		Proxy             config.Proxy `json:"proxy"`
+		DownloadDir       string       `json:"download_dir"`
+		DownloadTimeStart string       `json:"download_time_start"`
+		DownloadTimeEnd   string       `json:"download_time_end"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "invalid data")
@@ -38,14 +40,16 @@ func (s *Server) saveConfig(c *gin.Context) {
 		sessionDir = config.Defaults().SessionDir
 	}
 	cfg := config.Config{
-		APIID:       req.APIID,
-		APIHash:     req.APIHash,
-		SessionName: req.SessionName,
-		Channels:    req.Channels,
-		Proxy:       req.Proxy,
-		DownloadDir: req.DownloadDir,
-		SessionDir:  sessionDir,
-		PhoneNumber: existing.PhoneNumber,
+		APIID:             req.APIID,
+		APIHash:           req.APIHash,
+		SessionName:       req.SessionName,
+		Channels:          req.Channels,
+		Proxy:             req.Proxy,
+		DownloadDir:       req.DownloadDir,
+		SessionDir:        sessionDir,
+		PhoneNumber:       existing.PhoneNumber,
+		DownloadTimeStart: req.DownloadTimeStart,
+		DownloadTimeEnd:   req.DownloadTimeEnd,
 	}
 	if err := s.config.Save(cfg); err != nil {
 		response.ServerError(c, err.Error())

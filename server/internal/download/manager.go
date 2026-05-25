@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -33,6 +34,7 @@ type Broadcaster interface {
 type ConfigProvider interface {
 	GetChannels() ([]string, string)
 	ConfigDir() string
+	GetDownloadTimeRange() (start, end string)
 }
 
 // Manager orchestrates channel scanning and audio downloading.
@@ -85,6 +87,44 @@ func extractAudio(msg tg.MessageClass) (*tg.Message, *tg.Document, bool) {
 		return nil, nil, false
 	}
 	return msgMsg, doc, true
+}
+
+// parseTime parses "HH:mm" string to minutes since midnight.
+func parseTime(s string) int {
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return -1
+	}
+	h, _ := strconv.Atoi(parts[0])
+	m, _ := strconv.Atoi(parts[1])
+	if h < 0 || h > 23 || m < 0 || m > 59 {
+		return -1
+	}
+	return h*60 + m
+}
+
+// isWithinDownloadTime checks if the current time is within the allowed download window.
+// Returns true if no restriction is set (both empty) or current time is within range.
+func (m *Manager) isWithinDownloadTime() bool {
+	start, end := m.config.GetDownloadTimeRange()
+	if start == "" && end == "" {
+		return true
+	}
+	startMin := parseTime(start)
+	endMin := parseTime(end)
+	if startMin < 0 || endMin < 0 {
+		return true
+	}
+	if startMin == endMin {
+		return true
+	}
+	now := time.Now()
+	curMin := now.Hour()*60 + now.Minute()
+	if startMin <= endMin {
+		return curMin >= startMin && curMin <= endMin
+	}
+	// overnight range (e.g., 22:00-06:00)
+	return curMin >= startMin || curMin <= endMin
 }
 
 func docFileName(doc *tg.Document) string {
@@ -219,6 +259,12 @@ func (m *Manager) Start(ctx context.Context) error {
 			processed[next] = true
 			m.state.SetRunning(true, next)
 			m.state.AddLog(fmt.Sprintf("开始处理频道: %s", next))
+
+			if !m.isWithinDownloadTime() {
+				start, end := m.config.GetDownloadTimeRange()
+				m.state.AddLog(fmt.Sprintf("当前时间不在下载时间范围(%s-%s)内，停止下载", start, end))
+				return
+			}
 
 			count, err := m.downloadChannel(ctx, next, downloadDir)
 			if err != nil {
@@ -594,7 +640,7 @@ func (m *Manager) downloadMessage(ctx context.Context, channel, dir string, msgI
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
 		return false, fmt.Errorf("创建目录 %s 失败: %w", dirPath, err)
 	}
-	savePath := filepath.Join(dirPath, fmt.Sprintf("%d_%s", msgID, sanitizeFilename(docFileName(doc))))
+	savePath := filepath.Join(dirPath, sanitizeFilename(docFileName(doc)))
 
 	if m.record.Exists(channel, msgID) {
 		return true, nil

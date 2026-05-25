@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
-import {NConfigProvider, NMessageProvider, NDialogProvider, darkTheme} from 'naive-ui'
+import {NConfigProvider, NMessageProvider, NDialogProvider, darkTheme, zhCN, dateZhCN} from 'naive-ui'
 import {isDark} from './composables/useTheme'
 
 const route = useRoute()
@@ -11,7 +11,7 @@ const theme = computed(() => isDark.value ? darkTheme : null)
 </script>
 
 <template>
-  <n-config-provider :theme="theme">
+  <n-config-provider :theme="theme" :locale="zhCN" :date-locale="dateZhCN">
     <n-message-provider>
       <n-dialog-provider>
         <div class="container">

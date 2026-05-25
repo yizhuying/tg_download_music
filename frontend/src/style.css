@@ -182,7 +182,7 @@ nav a.active, nav a:hover {
 
 .proxy_settings {
     display: grid;
-    grid-template-columns: 96px 120px 60px 120px 140px auto;
+    grid-template-columns: 120px 180px 90px 150px 150px;
     gap: 10px;
 }
 
