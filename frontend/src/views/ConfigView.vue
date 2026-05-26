@@ -392,16 +392,16 @@ onMounted(() => {
         <div v-if="authLoading">检查中...</div>
         <div v-else-if="!authLoggedIn">
           <div class="form-row" style="align-items: flex-end; gap: 4px">
-            <div class="form-group" style="flex: none">
+            <div class="form-group" style="flex: 1; min-width: 140px">
               <label>手机号</label>
-              <n-input v-model:value="authPhone" style="width: 160px" placeholder="+86 13800138000" />
+              <n-input v-model:value="authPhone" placeholder="+86 13800138000" />
             </div>
             <div class="form-group" style="flex: none">
               <n-button type="primary" :disabled="!authPhone" @click="doSendCode">发送验证码</n-button>
             </div>
-            <div class="form-group" v-if="showCodeSection" style="flex: none">
+            <div class="form-group" v-if="showCodeSection" style="flex: none; width: 100px">
               <label>验证码</label>
-              <n-input v-model:value="authCode" style="width: 100px" placeholder="验证码" />
+              <n-input v-model:value="authCode" placeholder="验证码" />
             </div>
             <div class="form-group" v-if="showCodeSection" style="flex: none">
               <n-button type="primary" @click="doSignIn">登录</n-button>
@@ -409,9 +409,9 @@ onMounted(() => {
           </div>
           <div v-if="show2FA">
             <div class="form-row" style="align-items: flex-end; gap: 4px; margin-top: 2px">
-              <div class="form-group" style="flex: none">
+              <div class="form-group" style="flex: 1; min-width: 160px">
                 <label>两步验证密码</label>
-                <n-input v-model:value="auth2FA" type="password" show-password-on="click" style="width: 200px" placeholder="2FA 密码" />
+                <n-input v-model:value="auth2FA" type="password" show-password-on="click" placeholder="2FA 密码" />
               </div>
               <div class="form-group" style="flex: none">
                 <n-button type="primary" @click="doSignIn2FA">登录</n-button>

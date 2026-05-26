@@ -491,3 +491,71 @@ nav a.active, nav a:hover {
     color: var(--text-light);
     padding: 8px 0;
 }
+
+@media (max-width: 768px) {
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+
+    .container {
+        padding: 4px 8px;
+    }
+
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+
+    .api_cert {
+        grid-template-columns: 1fr;
+    }
+
+    .proxy_settings {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .form-row {
+        flex-wrap: wrap;
+    }
+
+    .form-actions {
+        width: auto;
+    }
+
+    .file-list {
+        max-height: 200px;
+    }
+
+    .logs-container {
+        max-height: 120px;
+    }
+
+    .file-item {
+        gap: 4px;
+        padding: 4px 4px;
+    }
+
+    .file-meta {
+        font-size: 0.65rem;
+    }
+
+    .card {
+        padding: 6px 8px;
+    }
+
+    .login-card {
+        width: 90%;
+        max-width: 320px;
+    }
+
+    .filter-bar {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .status-bar {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+}

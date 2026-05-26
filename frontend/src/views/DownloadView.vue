@@ -202,11 +202,11 @@ onUnmounted(() => {
       </div>
 
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:6px">
           <h2>文件列表 <span>({{ filteredMessages.length }}/{{ messages.length }})</span></h2>
           <div style="display:flex;gap:8px;align-items:center">
             <n-checkbox v-model:checked="filterHideDownloaded" @update:checked="applyFilters">隐藏已下载</n-checkbox>
-            <n-input v-model:value="searchInput" placeholder="搜索文件名..." @update:value="applyFilters" style="width:150px" />
+            <n-input v-model:value="searchInput" placeholder="搜索文件名..." @update:value="applyFilters" style="width:120px" />
           </div>
         </div>
         <div class="file-list">
