@@ -7,7 +7,7 @@
 | 层  | 技术                                       |
 |----|------------------------------------------|
 | 后端 | Go 1.25 + Gin + gotd/td (MTProto)        |
-| 前端 | Vue 3 + TypeScript + Vite + Element Plus |
+| 前端 | Vue 3 + TypeScript + Vite + Naive UI    |
 | 通信 | REST API + WebSocket 实时推送                |
 
 ## 项目结构
@@ -118,6 +118,8 @@ make fnos
     "password": ""
   },
   "download_dir": "./downloads",
+  "download_time_start": "",
+  "download_time_end": "",
   "session_dir": "./sessions",
   "phone_number": ""
 }

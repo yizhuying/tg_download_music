@@ -169,36 +169,24 @@ onUnmounted(() => {
     <div v-if="!showLogin">
       <div class="card">
         <h2>下载控制</h2>
-        <div class="form-row" style="gap: 4px; align-items: flex-end">
-          <div class="form-group" style="flex: none">
-            <n-button type="info" @click="doQuickTest">快速测试</n-button>
-          </div>
-          <div class="form-group" style="flex: none">
-            <n-button type="warning" @click="doScan">扫描文件列表</n-button>
-          </div>
-          <div class="form-group" style="flex: none">
-            <n-button type="success" @click="doStartAll">全部下载</n-button>
-          </div>
-          <div class="form-group">
-            <span style="font-size:0.75rem;color:#888">快速测试：自动下载第一个频道的第一条音频，用于验证功能</span>
-          </div>
+        <div class="btn-group">
+          <n-button type="info" size="small" @click="doQuickTest">快速测试</n-button>
+          <n-button type="warning" size="small" @click="doScan">扫描文件列表</n-button>
+          <n-button type="success" size="small" @click="doStartAll">全部下载</n-button>
         </div>
+        <p class="hint-text">快速测试：自动下载第一个频道的第一条音频，用于验证功能</p>
       </div>
 
       <div class="card">
         <h2>下载状态</h2>
-        <div class="form-row" style="gap: 4px; align-items: flex-end">
-          <div class="form-group" style="flex: none">
+        <div class="status-row">
+          <div class="status-info">
             <span class="badge" :class="running ? 'running' : 'idle'">{{ running ? '运行中' : '空闲' }}</span>
             <span style="font-size:0.78rem">{{ currentChannel }}</span>
           </div>
-          <div class="form-group" style="flex: none">
-            <n-button type="error" :disabled="!running" @click="doStop">停止下载</n-button>
-          </div>
-          <div class="form-group">
-            <span style="font-size:0.75rem;color:#888">已下载: {{ totalDownloaded }} 个 | 开始: {{ startedAt }} | 扫描: {{ scannedAt }}</span>
-          </div>
+          <n-button type="error" size="small" :disabled="!running" @click="doStop">停止下载</n-button>
         </div>
+        <p class="hint-text">已下载: {{ totalDownloaded }} 个 | 开始: {{ startedAt }} | 扫描: {{ scannedAt }}</p>
       </div>
 
       <div class="card">

@@ -372,17 +372,17 @@ onMounted(() => {
         <p style="font-size:0.78rem;color:#888;margin-bottom:8px">
           设置允许下载的时间范围，留空表示不限制。支持跨午夜（如 22:00 - 次日 06:00）。
         </p>
-        <div class="form-row" style="gap: 8px; align-items: center">
-          <div class="form-group" style="flex:none;width:150px">
+        <div class="time-range">
+          <div class="time-input-wrapper">
             <label>开始时间</label>
             <n-time-picker v-model:value="downloadTimeStart" format="HH:mm" clearable
-                           placeholder="不限" style="width:100%" />
+                           placeholder="不限制" size="small" />
           </div>
-          <span style="padding-top:20px">—</span>
-          <div class="form-group" style="flex:none;width:150px">
+          <span class="time-separator">~</span>
+          <div class="time-input-wrapper">
             <label>结束时间</label>
             <n-time-picker v-model:value="downloadTimeEnd" format="HH:mm" clearable
-                           placeholder="不限" style="width:100%" />
+                           placeholder="不限制" size="small" />
           </div>
         </div>
       </div>
@@ -420,9 +420,11 @@ onMounted(() => {
           </div>
         </div>
         <div v-else>
-          <div class="status-bar">
-            <span class="badge running">已登录</span>
-            <span>{{ authPhone }}</span>
+          <div class="status-row">
+            <div class="status-info">
+              <span class="badge running">已登录</span>
+              <span>{{ authPhone }}</span>
+            </div>
             <n-button type="error" size="small" @click="doLogout">退出登录</n-button>
           </div>
         </div>
