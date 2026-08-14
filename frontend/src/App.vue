@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import {computed} from 'vue'
+import {computed, onMounted} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {NConfigProvider, NMessageProvider, NDialogProvider, darkTheme, zhCN, dateZhCN} from 'naive-ui'
 import {isDark} from './composables/useTheme'
+import {connect} from './api/ws'
 
 const route = useRoute()
 const router = useRouter()
 
 const theme = computed(() => isDark.value ? darkTheme : null)
+
+// The WebSocket connection is app-level: established once on startup and
+// reused across route changes; views only subscribe to messages.
+onMounted(() => {
+  connect()
+})
 </script>
 
 <template>

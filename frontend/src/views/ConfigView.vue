@@ -6,7 +6,7 @@ import {
   type Config, type AuthStatus,
 } from '../api/http'
 import {useRouter} from 'vue-router'
-import {useMessage, useDialog, NInput, NButton, NInputNumber, NSelect, NTag, NTimePicker} from 'naive-ui'
+import {useMessage, useDialog, NInput, NButton, NInputNumber, NSelect, NTag, NTimePicker, NCheckbox, NCheckboxGroup} from 'naive-ui'
 
 const router = useRouter()
 const message = useMessage()
@@ -24,6 +24,21 @@ const downloadDir = ref('')
 const channels = ref<string[]>([])
 const downloadTimeStart = ref<number | null>(null)
 const downloadTimeEnd = ref<number | null>(null)
+// 允许下载的音频格式；空数组表示全部
+const audioFormats = ref<string[]>([])
+
+const audioFormatOptions = [
+  {label: 'MP3', value: 'mp3'},
+  {label: 'FLAC', value: 'flac'},
+  {label: 'OGG', value: 'ogg'},
+  {label: 'M4A', value: 'm4a'},
+  {label: 'WAV', value: 'wav'},
+  {label: 'AAC', value: 'aac'},
+]
+
+function selectAllFormats() {
+  audioFormats.value = []
+}
 
 const authLoading = ref(true)
 const authLoggedIn = ref(false)
@@ -36,6 +51,9 @@ const auth2FA = ref('')
 
 const pickerDirs = ref<Array<{label: string; value: string}>>([])
 const pickerLoading = ref(false)
+// 是否已成功加载过目录列表；与结果是否为空区分开，
+// 避免接口返回空列表时每次点开下拉都重新请求。
+const dirsLoaded = ref(false)
 const proxyLoading = ref(false)
 
 const proxyOptions = [
@@ -59,16 +77,20 @@ function timestampToHhmm(ts: number | null): string {
 }
 
 async function loadDirOptions() {
+  pickerLoading.value = true
   try {
     const data = await getDownloadDirList()
     pickerDirs.value = Array.isArray(data) ? data : []
+    dirsLoaded.value = true
   } catch {
-    // ignore
+    // 加载失败时保持 dirsLoaded 为 false，点开下拉可重试
+  } finally {
+    pickerLoading.value = false
   }
 }
 
 async function onDirSelectVisible(visible: boolean) {
-  if (visible && pickerDirs.value.length === 0) {
+  if (visible && !dirsLoaded.value) {
     await loadDirOptions()
   }
 }
@@ -95,6 +117,7 @@ function fillConfig(data: Config) {
   channels.value = data.channels || []
   downloadTimeStart.value = hhmmToTimestamp(data.download_time_start || '')
   downloadTimeEnd.value = hhmmToTimestamp(data.download_time_end || '')
+  audioFormats.value = (data.audio_formats || []).map(f => f.toLowerCase())
 }
 
 async function loadAuthStatus() {
@@ -194,6 +217,7 @@ async function doSaveConfig(): Promise<boolean> {
     download_dir: downloadDir.value,
     download_time_start: timestampToHhmm(downloadTimeStart.value),
     download_time_end: timestampToHhmm(downloadTimeEnd.value),
+    audio_formats: audioFormats.value,
   }
   try {
     const res = await saveConfig(data)
@@ -267,10 +291,10 @@ onMounted(() => {
             <label>API Hash <span class="required">*</span></label>
             <n-input v-model:value="apiHash" type="password" placeholder="API Hash" show-password-on="click" />
           </div>
-          <div class="form-group">
+          <!-- <div class="form-group">
             <label>Session 名称</label>
             <n-input v-model:value="sessionName" />
-          </div>
+          </div> -->
         </div>
       </div>
 
@@ -317,6 +341,17 @@ onMounted(() => {
           <n-input v-if="showChannelInput" v-model:value="newChannel" size="small" placeholder="输入后回车"
                    style="width: 120px" @keyup.enter="confirmAddChannel" @blur="confirmAddChannel" autofocus />
           <n-button v-else size="small" @click="showChannelInput = true">+ 添加</n-button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>音频格式</h2>
+        <p class="hint-text">勾选要扫描和下载的音频格式，都不勾选时下载全部格式</p>
+        <div class="format-filter">
+          <n-checkbox :checked="audioFormats.length === 0" @update:checked="selectAllFormats">全部</n-checkbox>
+          <n-checkbox-group v-model:value="audioFormats">
+            <n-checkbox v-for="opt in audioFormatOptions" :key="opt.value" :value="opt.value" :label="opt.label" />
+          </n-checkbox-group>
         </div>
       </div>
 

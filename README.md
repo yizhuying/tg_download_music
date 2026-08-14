@@ -118,10 +118,13 @@ make fnos
   "download_dir": "./downloads",
   "download_time_start": "",
   "download_time_end": "",
+  "audio_formats": [],
   "session_dir": "./sessions",
   "phone_number": ""
 }
 ```
+
+`audio_formats`：允许下载的音频格式列表（小写扩展名，如 `["mp3", "flac"]`），空数组表示下载全部格式。在设置页"音频格式"中勾选，对扫描和批量下载生效。
 
 配置文件支持热加载——修改后自动生效，无需重启服务。
 

@@ -1,5 +1,6 @@
 import {ref} from 'vue'
 import {createDiscreteApi} from 'naive-ui'
+import type {DownloadStatus} from './response'
 
 export type WSMessageType = 'download_status' | 'log' | 'scan_result' | 'file_downloaded' | 'pong'
 
@@ -18,13 +19,17 @@ export type WSStatus = 'connecting' | 'connected' | 'retrying' | 'closed'
 export const wsStatus = ref<WSStatus>('closed')
 export const wsRetryCount = ref(0)
 
+// Latest download_status payload seen on the connection. The connection is
+// app-level and outlives the views, so a view mounting late reads this
+// instead of waiting for the next broadcast.
+export const latestDownloadStatus = ref<DownloadStatus | null>(null)
+
 const {message} = createDiscreteApi(['message'])
 
 type Handler = (msg: WSMessage) => void
 
 let ws: WebSocket | null = null
 let handlers: Handler[] = []
-let stateHandler: ((payload: any) => void) | null = null
 let reconnectDelay = 5000
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
@@ -74,7 +79,9 @@ function open() {
     try {
       const msg: WSMessage = JSON.parse(event.data)
       if (msg.type === 'pong') return
-      if (msg.type === 'download_status' && stateHandler) stateHandler(msg.payload)
+      if (msg.type === 'download_status') {
+        latestDownloadStatus.value = msg.payload
+      }
       handlers.forEach(h => h(msg))
     } catch {}
   }
@@ -95,22 +102,32 @@ function open() {
   }
 }
 
-export function connect(onStateSnapshot?: (payload: any) => void) {
+// connect establishes the app-level singleton connection. It is idempotent:
+// repeated calls reuse the existing (or pending) connection, and a call
+// during the retry backoff reconnects immediately.
+export function connect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    return
+  }
   closeSocket()
-  handlers = []
-  stateHandler = onStateSnapshot ?? null
   reconnectDelay = 5000
   wsRetryCount.value = 0
   open()
 }
 
-export function onMessage(handler: Handler) {
+// onMessage registers a handler and returns its unsubscribe function so
+// views can subscribe on mount and clean up on unmount.
+export function onMessage(handler: Handler): () => void {
   handlers.push(handler)
+  return () => {
+    const i = handlers.indexOf(handler)
+    if (i !== -1) handlers.splice(i, 1)
+  }
 }
 
 export function disconnect() {
   closeSocket()
   handlers = []
-  stateHandler = null
+  latestDownloadStatus.value = null
   wsStatus.value = 'closed'
 }

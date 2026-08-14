@@ -6,7 +6,7 @@ import {
   type DownloadStatus, type DownloadList,
 } from '../api/http'
 import {NInput, NButton, NCheckbox} from 'naive-ui'
-import {connect, onMessage, disconnect, wsStatus, wsRetryCount} from '../api/ws'
+import {onMessage, wsStatus, wsRetryCount, latestDownloadStatus} from '../api/ws'
 
 const running = ref(false)
 const totalDownloaded = ref(0)
@@ -28,39 +28,38 @@ const messages = ref<ScannedFile[]>([])
 const searchInput = ref('')
 const filterHideDownloaded = ref(false)
 
+// applyLiveStatus applies a live download_status payload. Incremental
+// updates omit some fields; only apply them when present.
+function applyLiveStatus(snapshot: DownloadStatus) {
+  running.value = snapshot.running
+  totalDownloaded.value = snapshot.total_downloaded ?? 0
+  currentChannel.value = snapshot.current_channel || '-'
+  if (snapshot.started_at) startedAt.value = snapshot.started_at
+  if (Array.isArray(snapshot.logs)) logs.value = snapshot.logs
+}
+
+function handleWSMessage(msg: { type: string; payload: { time?: string; message?: string; running?: boolean; total_downloaded?: number; current_channel?: string; messages?: ScannedFile[]; scanned_at?: string; channel?: string; msg_id?: number } }) {
+  if (msg.type === 'log') {
+    logs.value.push({ time: msg.payload.time || '', message: msg.payload.message || '' })
+    if (logs.value.length > 500) logs.value = logs.value.slice(-500)
+  } else if (msg.type === 'download_status') {
+    applyLiveStatus(msg.payload as DownloadStatus)
+  } else if (msg.type === 'file_downloaded') {
+    if (msg.payload.channel && msg.payload.msg_id) {
+      const item = messages.value.find(m => m.channel === msg.payload.channel && m.msg_id === msg.payload.msg_id)
+      if (item) item.exists = true
+    }
+  } else if (msg.type === 'scan_result') {
+    messages.value = msg.payload.messages || []
+    scannedAt.value = msg.payload.scanned_at || '-'
+  }
+}
+
 function initPage(data: DownloadStatus) {
   running.value = data.running
   totalDownloaded.value = data.total_downloaded
   startedAt.value = data.started_at || '-'
   logs.value = data.logs || []
-
-  connect((snapshot: DownloadStatus) => {
-    running.value = snapshot.running
-    totalDownloaded.value = snapshot.total_downloaded ?? 0
-    currentChannel.value = snapshot.current_channel || '-'
-    // Incremental updates omit these fields; only apply them when present.
-    if (snapshot.started_at) startedAt.value = snapshot.started_at
-    if (Array.isArray(snapshot.logs)) logs.value = snapshot.logs
-  })
-
-  onMessage((msg: { type: string; payload: { time?: string; message?: string; running?: boolean; total_downloaded?: number; current_channel?: string; messages?: ScannedFile[]; scanned_at?: string; channel?: string; msg_id?: number } }) => {
-    if (msg.type === 'log') {
-      logs.value.push({ time: msg.payload.time || '', message: msg.payload.message || '' })
-      if (logs.value.length > 500) logs.value = logs.value.slice(-500)
-    } else if (msg.type === 'download_status') {
-      running.value = !!msg.payload.running
-      totalDownloaded.value = msg.payload.total_downloaded ?? 0
-      currentChannel.value = msg.payload.current_channel || '-'
-    } else if (msg.type === 'file_downloaded') {
-      if (msg.payload.channel && msg.payload.msg_id) {
-        const item = messages.value.find(m => m.channel === msg.payload.channel && m.msg_id === msg.payload.msg_id)
-        if (item) item.exists = true
-      }
-    } else if (msg.type === 'scan_result') {
-      messages.value = msg.payload.messages || []
-      scannedAt.value = msg.payload.scanned_at || '-'
-    }
-  })
 
   getDownloadList().then((data: DownloadList) => {
     messages.value = data.messages || []
@@ -138,14 +137,21 @@ const filteredMessages = computed(() => {
   return result
 })
 
+let offMessages: (() => void) | null = null
+
 onMounted(() => {
+  offMessages = onMessage(handleWSMessage)
+  // The app-level connection may already have a cached status; apply it
+  // immediately so the page is instant while the REST refresh is pending.
+  if (latestDownloadStatus.value) applyLiveStatus(latestDownloadStatus.value)
   getDownloadStatus()
     .then(initPage)
     .catch(() => initPage({running: false, total_downloaded: 0, current_channel: '', started_at: '', logs: []}))
 })
 
 onUnmounted(() => {
-  disconnect()
+  offMessages?.()
+  offMessages = null
 })
 </script>
 

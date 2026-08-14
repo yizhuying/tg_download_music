@@ -502,6 +502,13 @@ nav a:not(.active):hover {
     border: 1px solid var(--border-light);
 }
 
+.format-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 14px;
+}
+
 .file-item {
     display: flex;
     align-items: center;

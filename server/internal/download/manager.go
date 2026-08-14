@@ -35,6 +35,7 @@ type ConfigProvider interface {
 	GetChannels() ([]string, string)
 	ConfigDir() string
 	GetDownloadTimeRange() (start, end string)
+	GetAudioFormats() []string
 }
 
 // Manager orchestrates channel scanning and audio downloading.
@@ -156,6 +157,30 @@ func mimeExt(mime string) string {
 	default:
 		return "bin"
 	}
+}
+
+// audioFormatOf returns the lowercase extension of the document's audio
+// format, preferring the filename and falling back to the MIME type.
+func audioFormatOf(doc *tg.Document) string {
+	if ext := strings.TrimPrefix(filepath.Ext(docFileName(doc)), "."); ext != "" {
+		return strings.ToLower(ext)
+	}
+	return mimeExt(doc.MimeType)
+}
+
+// formatAllowed reports whether the document passes the audio format filter.
+// An empty filter allows every format.
+func formatAllowed(formats []string, doc *tg.Document) bool {
+	if len(formats) == 0 {
+		return true
+	}
+	f := audioFormatOf(doc)
+	for _, allowed := range formats {
+		if strings.EqualFold(allowed, f) {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveChannel resolves a @username to channel info and an InputPeer.
@@ -499,6 +524,9 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 			if !ok || !isAudio(doc) {
 				continue
 			}
+			if !formatAllowed(m.config.GetAudioFormats(), doc) {
+				continue
+			}
 
 			m.state.AddLog(fmt.Sprintf("找到音频: %s", sanitizeFilename(docFileName(doc))))
 			saveName := sanitizeFilename(docFileName(doc))
@@ -588,6 +616,9 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 			if !ok || !isAudio(doc) {
 				continue
 			}
+			if !formatAllowed(m.config.GetAudioFormats(), doc) {
+				continue
+			}
 			saveName := sanitizeFilename(docFileName(doc))
 			savePath := uniquePath(filepath.Join(dirPath, saveName))
 			if m.record.Exists(channel, msgMsg.ID) {
@@ -663,6 +694,9 @@ func (m *Manager) scanChannel(ctx context.Context, channel, downloadDir string) 
 			offsetID = msg.GetID()
 			msgMsg, doc, ok := extractAudio(msg)
 			if !ok || !isAudio(doc) {
+				continue
+			}
+			if !formatAllowed(m.config.GetAudioFormats(), doc) {
 				continue
 			}
 			fileName := sanitizeFilename(docFileName(doc))

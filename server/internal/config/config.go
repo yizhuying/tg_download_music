@@ -27,15 +27,17 @@ type Config struct {
 	PhoneNumber       string   `json:"phone_number"`
 	DownloadTimeStart string   `json:"download_time_start"` // "HH:mm" 允许下载的开始时间
 	DownloadTimeEnd   string   `json:"download_time_end"`   // "HH:mm" 允许下载的结束时间
+	AudioFormats      []string `json:"audio_formats"`       // 允许下载的音频格式（小写扩展名），空表示全部
 }
 
 func Defaults() Config {
 	return Config{
-		SessionName: "my_session",
-		Channels:    []string{},
-		Proxy:       Proxy{Scheme: "socks5"},
-		DownloadDir: "",
-		SessionDir:  "./sessions",
+		SessionName:  "my_session",
+		Channels:     []string{},
+		Proxy:        Proxy{Scheme: "socks5"},
+		DownloadDir:  "",
+		SessionDir:   "./sessions",
+		AudioFormats: []string{},
 	}
 }
 
@@ -81,6 +83,12 @@ func (m *Manager) GetChannels() ([]string, string) {
 func (m *Manager) GetDownloadTimeRange() (string, string) {
 	c := m.Get()
 	return c.DownloadTimeStart, c.DownloadTimeEnd
+}
+
+// GetAudioFormats returns the allowed audio formats; empty means all.
+func (m *Manager) GetAudioFormats() []string {
+	c := m.Get()
+	return c.AudioFormats
 }
 
 func (m *Manager) ConfigDir() string {

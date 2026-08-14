@@ -26,6 +26,7 @@ export interface Config {
     phone_number: string
     download_time_start: string
     download_time_end: string
+    audio_formats: string[]
 }
 
 export interface AuthStatus {

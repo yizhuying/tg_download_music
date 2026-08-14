@@ -28,6 +28,7 @@ func (s *Server) saveConfig(c *gin.Context) {
 		DownloadDir       string       `json:"download_dir"`
 		DownloadTimeStart string       `json:"download_time_start"`
 		DownloadTimeEnd   string       `json:"download_time_end"`
+		AudioFormats      []string     `json:"audio_formats"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "invalid data")
@@ -50,6 +51,7 @@ func (s *Server) saveConfig(c *gin.Context) {
 		PhoneNumber:       existing.PhoneNumber,
 		DownloadTimeStart: req.DownloadTimeStart,
 		DownloadTimeEnd:   req.DownloadTimeEnd,
+		AudioFormats:      req.AudioFormats,
 	}
 	if err := s.config.Save(cfg); err != nil {
 		response.ServerError(c, err.Error())
