@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/tg"
 	"github.com/gotd/td/tgerr"
 )
@@ -65,23 +66,19 @@ func (c *Client) SignIn(ctx context.Context, phone, code, phoneCodeHash string) 
 	return &SignInResult{Success: true, User: userName}, nil
 }
 
-// SignInWithPassword attempts sign-in after SendCode, without requiring
-// re-sending the code. For full 2FA SRP password support, additional
-// computation is needed — this is a placeholder.
-func (c *Client) SignInWithPassword(ctx context.Context, phone, code, phoneCodeHash, _ string) (*SignInResult, error) {
-	req := &tg.AuthSignInRequest{
-		PhoneNumber:   phone,
-		PhoneCodeHash: phoneCodeHash,
-	}
-	req.SetPhoneCode(code)
-
-	auth, err := c.client.API().AuthSignIn(ctx, req)
+// SignInWithPassword completes sign-in with the 2FA cloud password via the
+// SRP flow. The verification code must already have been accepted by SignIn
+// (which reported Need2FA); the code is consumed at that point, so only the
+// password is needed here.
+func (c *Client) SignInWithPassword(ctx context.Context, password string) (*SignInResult, error) {
+	authz, err := c.client.Auth().Password(ctx, password)
 	if err != nil {
+		if errors.Is(err, auth.ErrPasswordInvalid) {
+			return nil, fmt.Errorf("两步验证密码错误")
+		}
 		return nil, fmt.Errorf("sign in with password: %w", err)
 	}
-
-	userName := extractUserNameFromAuth(auth)
-	return &SignInResult{Success: true, User: userName}, nil
+	return &SignInResult{Success: true, User: extractUserNameFromAuth(authz)}, nil
 }
 
 func isPasswordError(err error) bool {

@@ -1,19 +1,12 @@
 <script setup lang="ts">
-import {ref, onMounted, onUnmounted} from 'vue'
+import {ref, computed, onMounted, onUnmounted} from 'vue'
 import {
   getDownloadStatus, startDownload, stopDownload, scanChannels,
   getDownloadList, downloadSingle, quickTest,
-  setAdminPassword, getAdminPassword,
   type DownloadStatus, type DownloadList,
 } from '../api/http'
 import {NInput, NButton, NCheckbox} from 'naive-ui'
-import {connect, onMessage, disconnect} from '../api/ws'
-
-const savedPwd = getAdminPassword() || sessionStorage.getItem('tg_admin_pwd') || ''
-if (savedPwd) setAdminPassword(savedPwd)
-const showLogin = ref(!savedPwd)
-const loginPassword = ref('')
-const loginError = ref('')
+import {connect, onMessage, disconnect, wsStatus, wsRetryCount} from '../api/ws'
 
 const running = ref(false)
 const totalDownloaded = ref(0)
@@ -35,15 +28,6 @@ const messages = ref<ScannedFile[]>([])
 const searchInput = ref('')
 const filterHideDownloaded = ref(false)
 
-function doLogin() {
-  if (!loginPassword.value) { loginError.value = '请输入密码'; return }
-  setAdminPassword(loginPassword.value)
-  getDownloadStatus()
-    .then(initPage)
-    .then(() => { showLogin.value = false; sessionStorage.setItem('tg_admin_pwd', loginPassword.value) })
-    .catch(() => { loginError.value = '密码错误' })
-}
-
 function initPage(data: DownloadStatus) {
   running.value = data.running
   totalDownloaded.value = data.total_downloaded
@@ -52,19 +36,26 @@ function initPage(data: DownloadStatus) {
 
   connect((snapshot: DownloadStatus) => {
     running.value = snapshot.running
-    totalDownloaded.value = snapshot.total_downloaded
+    totalDownloaded.value = snapshot.total_downloaded ?? 0
     currentChannel.value = snapshot.current_channel || '-'
-    startedAt.value = snapshot.started_at || '-'
-    logs.value = snapshot.logs || []
+    // Incremental updates omit these fields; only apply them when present.
+    if (snapshot.started_at) startedAt.value = snapshot.started_at
+    if (Array.isArray(snapshot.logs)) logs.value = snapshot.logs
   })
 
-  onMessage((msg: { type: string; payload: { time?: string; message?: string; running?: boolean; total_downloaded?: number; current_channel?: string; messages?: ScannedFile[]; scanned_at?: string } }) => {
+  onMessage((msg: { type: string; payload: { time?: string; message?: string; running?: boolean; total_downloaded?: number; current_channel?: string; messages?: ScannedFile[]; scanned_at?: string; channel?: string; msg_id?: number } }) => {
     if (msg.type === 'log') {
       logs.value.push({ time: msg.payload.time || '', message: msg.payload.message || '' })
+      if (logs.value.length > 500) logs.value = logs.value.slice(-500)
     } else if (msg.type === 'download_status') {
       running.value = !!msg.payload.running
       totalDownloaded.value = msg.payload.total_downloaded ?? 0
       currentChannel.value = msg.payload.current_channel || '-'
+    } else if (msg.type === 'file_downloaded') {
+      if (msg.payload.channel && msg.payload.msg_id) {
+        const item = messages.value.find(m => m.channel === msg.payload.channel && m.msg_id === msg.payload.msg_id)
+        if (item) item.exists = true
+      }
     } else if (msg.type === 'scan_result') {
       messages.value = msg.payload.messages || []
       scannedAt.value = msg.payload.scanned_at || '-'
@@ -128,22 +119,29 @@ function formatSize(bytes: number): string {
   return s.toFixed(1) + units[i]
 }
 
-const filteredMessages = ref<ScannedFile[]>([])
+const wsStatusLabel = computed(() => {
+  switch (wsStatus.value) {
+    case 'connected': return '已连接'
+    case 'connecting': return '连接中...'
+    case 'retrying': return `连接失败，重试中 (${wsRetryCount.value})`
+    default: return '未连接'
+  }
+})
 
-function applyFilters() {
+const filteredMessages = computed(() => {
   let result = messages.value
   if (filterHideDownloaded.value) result = result.filter(m => !m.exists)
   if (searchInput.value) {
     const term = searchInput.value.toLowerCase()
     result = result.filter(m => m.file_name.toLowerCase().includes(term))
   }
-  filteredMessages.value = result
-}
+  return result
+})
 
-onMounted(async () => {
-  if (getAdminPassword()) {
-    getDownloadStatus().then(initPage).catch(() => { showLogin.value = true })
-  }
+onMounted(() => {
+  getDownloadStatus()
+    .then(initPage)
+    .catch(() => initPage({running: false, total_downloaded: 0, current_channel: '', started_at: '', logs: []}))
 })
 
 onUnmounted(() => {
@@ -153,20 +151,7 @@ onUnmounted(() => {
 
 <template>
   <div>
-    <div v-if="showLogin" class="login-overlay">
-      <div class="login-card">
-        <h2>管理登录</h2>
-        <div class="form-group">
-          <label>密码</label>
-          <n-input type="password" v-model:value="loginPassword" placeholder="输入管理密码"
-                   show-password-on="click" @keydown.enter="doLogin" />
-        </div>
-        <div class="login-error">{{ loginError }}</div>
-        <n-button type="primary" style="width:100%" @click="doLogin">登录</n-button>
-      </div>
-    </div>
-
-    <div v-if="!showLogin">
+    <div>
       <div class="card">
         <h2>下载控制</h2>
         <div class="btn-group">
@@ -178,7 +163,13 @@ onUnmounted(() => {
       </div>
 
       <div class="card">
-        <h2>下载状态</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2>下载状态</h2>
+          <span class="badge"
+                :class="wsStatus === 'connected' ? 'ws-ok' : wsStatus === 'retrying' ? 'ws-bad' : 'ws-wait'">
+            {{ wsStatusLabel }}
+          </span>
+        </div>
         <div class="status-row">
           <div class="status-info">
             <span class="badge" :class="running ? 'running' : 'idle'">{{ running ? '运行中' : '空闲' }}</span>
@@ -193,13 +184,13 @@ onUnmounted(() => {
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:6px">
           <h2>文件列表 <span>({{ filteredMessages.length }}/{{ messages.length }})</span></h2>
           <div style="display:flex;gap:8px;align-items:center">
-            <n-checkbox v-model:checked="filterHideDownloaded" @update:checked="applyFilters">隐藏已下载</n-checkbox>
-            <n-input v-model:value="searchInput" placeholder="搜索文件名..." @update:value="applyFilters" style="width:120px" />
+            <n-checkbox v-model:checked="filterHideDownloaded">隐藏已下载</n-checkbox>
+            <n-input v-model:value="searchInput" placeholder="搜索文件名..." style="width:120px" />
           </div>
         </div>
         <div class="file-list">
           <div v-if="filteredMessages.length === 0" class="empty-tip">暂无文件，请先扫描</div>
-          <div v-for="m in filteredMessages" :key="m.msg_id"
+          <div v-for="m in filteredMessages" :key="m.channel + '_' + m.msg_id"
             class="file-item" :class="{ 'file-exists': m.exists }">
             <div class="file-info">
               <div class="file-name">{{ m.file_name }}</div>

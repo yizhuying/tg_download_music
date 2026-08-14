@@ -44,7 +44,20 @@ type Manager struct {
 	cfg     Config
 	path    string
 	modTime time.Time
+
+	wmu      sync.Mutex
+	writable map[string]writableEntry
 }
+
+// writableEntry caches a directory writability check with its check time.
+type writableEntry struct {
+	ok bool
+	at time.Time
+}
+
+// writableCacheTTL limits how long a writability result is reused, so the
+// check does not hit the disk on every Get() call.
+const writableCacheTTL = 30 * time.Second
 
 func NewManager(configPath string) (*Manager, error) {
 	cfg := Defaults()
@@ -77,12 +90,12 @@ func (m *Manager) ConfigDir() string {
 func (m *Manager) Get() Config {
 	m.reloadIfChanged()
 	m.mu.RLock()
-	defer m.mu.RUnlock()
 	c := m.cfg
-	if !isWritable(c.DownloadDir) {
+	m.mu.RUnlock()
+	if !m.isWritableCached(c.DownloadDir) {
 		if paths := os.Getenv("TRIM_DATA_ACCESSIBLE_PATHS"); paths != "" {
 			for _, p := range filepath.SplitList(paths) {
-				if isWritable(p) {
+				if p != "" && m.isWritableCached(p) {
 					c.DownloadDir = p
 					break
 				}
@@ -90,6 +103,31 @@ func (m *Manager) Get() Config {
 		}
 	}
 	return c
+}
+
+// isWritableCached reports whether path is writable, caching results for
+// writableCacheTTL to avoid disk probes on every configuration read.
+func (m *Manager) isWritableCached(path string) bool {
+	if path == "" {
+		return false
+	}
+
+	m.wmu.Lock()
+	if e, ok := m.writable[path]; ok && time.Since(e.at) < writableCacheTTL {
+		m.wmu.Unlock()
+		return e.ok
+	}
+	m.wmu.Unlock()
+
+	ok := isWritable(path)
+
+	m.wmu.Lock()
+	if m.writable == nil {
+		m.writable = make(map[string]writableEntry)
+	}
+	m.writable[path] = writableEntry{ok: ok, at: time.Now()}
+	m.wmu.Unlock()
+	return ok
 }
 
 func isWritable(path string) bool {
@@ -122,7 +160,17 @@ func (m *Manager) Save(c Config) error {
 	}
 	dir := filepath.Dir(m.path)
 	_ = os.MkdirAll(dir, 0o755)
-	return os.WriteFile(m.path, data, 0o644)
+	if err := os.WriteFile(m.path, data, 0o644); err != nil {
+		return err
+	}
+	// Record the new mod time so reloadIfChanged does not re-read the file
+	// we just wrote on the next Get().
+	if info, err := os.Stat(m.path); err == nil {
+		m.mu.Lock()
+		m.modTime = info.ModTime()
+		m.mu.Unlock()
+	}
+	return nil
 }
 
 func (m *Manager) reloadIfChanged() {
@@ -131,20 +179,25 @@ func (m *Manager) reloadIfChanged() {
 		return
 	}
 
-	if info.ModTime().After(m.modTime) {
-		data, err := os.ReadFile(m.path)
-		if err != nil {
-			return
-		}
-
-		var cfg Config
-		if err := json.Unmarshal(data, &cfg); err != nil {
-			return
-		}
-
-		m.mu.Lock()
-		m.cfg = cfg
-		m.modTime = info.ModTime()
-		m.mu.Unlock()
+	m.mu.RLock()
+	changed := info.ModTime().After(m.modTime)
+	m.mu.RUnlock()
+	if !changed {
+		return
 	}
+
+	data, err := os.ReadFile(m.path)
+	if err != nil {
+		return
+	}
+
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return
+	}
+
+	m.mu.Lock()
+	m.cfg = cfg
+	m.modTime = info.ModTime()
+	m.mu.Unlock()
 }

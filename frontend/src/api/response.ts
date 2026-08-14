@@ -40,8 +40,6 @@ export interface DownloadStatus {
     current_channel: string
     started_at: string
     logs: { time: string; message: string }[]
-    version: string
-    build_time: string
 }
 
 export interface ScannedFile {
@@ -72,7 +70,11 @@ export function unwrap<T>(res: ApiResponse<T>): T {
 http.interceptors.response.use(
     (res: AxiosResponse) => {
         const body = res.data as ApiResponse
-        if (body.code !== undefined && body.code !== 0) {
+        if (body.code === undefined) {
+            message.error('接口响应异常', {duration: 3000})
+            return Promise.reject(new Error('invalid response'))
+        }
+        if (body.code !== 0) {
             const msg = body.message || '请求失败'
             message.error(msg, {duration: 3000})
             return Promise.reject(new Error(msg))

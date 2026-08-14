@@ -8,11 +8,6 @@ if [ -z "${APP_PORT}" ]; then
     APP_PORT="45116"
 fi
 
-APP_PASSWORD="${wizard_app_password}"
-if [ -n "${APP_PASSWORD}" ]; then
-    export ADMIN_PASSWORD="${APP_PASSWORD}"
-fi
-
 # Export fnOS data paths for the Go process
 # TRIM_DATA_SHARE_PATHS: always available (from data-share config)
 # TRIM_DATA_ACCESSIBLE_PATHS: V1.1.8+ only

@@ -91,11 +91,9 @@ make fnos
 | `-download-dir`   | `./downloads` | 覆盖下载目录               |
 | `-session-dir`    | `./sessions`  | 覆盖 session 存储目录      |
 | `-socket`         | 空             | Unix Socket 路径（网关模式） |
-| `-admin-password` | `admin`       | 管理密码                 |
 
 环境变量：
 
-- `ADMIN_PASSWORD`：管理密码（命令行参数优先）
 - `TRIM_DATA_ACCESSIBLE_PATHS`：fnOS 可写路径（冒号分隔）
 
 ## 配置文件 (config.json)
@@ -129,16 +127,14 @@ make fnos
 
 ## API 接口
 
-所有接口需通过 `X-Admin-Password` Header 鉴权。
+### Telegram 认证
 
-### 认证
-
-| 方法   | 路径                    | 说明           |
-|------|-----------------------|--------------|
-| GET  | `/api/auth/status`    | 查询认证状态       |
-| POST | `/api/auth/send_code` | 发送验证码        |
-| POST | `/api/auth/sign_in`   | 登录（验证码/二次密码） |
-| POST | `/api/auth/logout`    | 登出           |
+| 方法   | 路径                        | 说明           |
+|------|---------------------------|--------------|
+| GET  | `/api/tg/auth/status`    | 查询认证状态       |
+| POST | `/api/tg/auth/send_code` | 发送验证码        |
+| POST | `/api/tg/auth/sign_in`   | 登录（验证码/二次密码） |
+| POST | `/api/tg/auth/logout`    | 登出           |
 
 ### 配置
 

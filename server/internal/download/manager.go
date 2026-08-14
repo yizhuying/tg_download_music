@@ -39,13 +39,14 @@ type ConfigProvider interface {
 
 // Manager orchestrates channel scanning and audio downloading.
 type Manager struct {
-	state  *DownloadState
-	client TelegramAPI
-	hub    Broadcaster
-	config ConfigProvider
-	record *DownloadRecord
-	mu     sync.Mutex
-	cancel context.CancelFunc
+	state      *DownloadState
+	client     TelegramAPI
+	hub        Broadcaster
+	config     ConfigProvider
+	record     *DownloadRecord
+	mu         sync.Mutex
+	cancel     context.CancelFunc
+	scanCancel context.CancelFunc
 }
 
 // NewManager creates a new Manager.
@@ -59,9 +60,11 @@ func NewManager(client TelegramAPI, state *DownloadState, hub Broadcaster, confi
 	}
 }
 
+// filenameSanitizer strips characters that are invalid in file names.
+var filenameSanitizer = regexp.MustCompile(`[\\/*?:"<>|]`)
+
 func sanitizeFilename(name string) string {
-	re := regexp.MustCompile(`[\\/*?:"<>|]`)
-	return re.ReplaceAllString(name, "_")
+	return filenameSanitizer.ReplaceAllString(name, "_")
 }
 
 func isAudio(doc *tg.Document) bool {
@@ -295,18 +298,88 @@ func (m *Manager) Stop() error {
 	return nil
 }
 
+// Close stops any running download or scan and releases the record store.
+func (m *Manager) Close() {
+	_ = m.Stop()
+	m.mu.Lock()
+	scanCancel := m.scanCancel
+	m.mu.Unlock()
+	if scanCancel != nil {
+		scanCancel()
+	}
+	if m.record != nil {
+		_ = m.record.Close()
+	}
+}
+
+// dedupeMessages merges scanned messages by channel+msgID, keeping the
+// latest entry so repeated scans refresh the list instead of duplicating it.
+func dedupeMessages(msgs []ScannedMessage) []ScannedMessage {
+	seen := make(map[string]int, len(msgs))
+	out := make([]ScannedMessage, 0, len(msgs))
+	for _, msg := range msgs {
+		key := msg.Channel + "#" + strconv.Itoa(msg.MsgID)
+		if i, ok := seen[key]; ok {
+			out[i] = msg
+			continue
+		}
+		seen[key] = len(out)
+		out = append(out, msg)
+	}
+	return out
+}
+
+// uniquePath returns a non-existing path, appending " (n)" before the
+// extension when needed, so files with the same name never overwrite
+// each other.
+func uniquePath(path string) string {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return path
+	}
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	for i := 1; ; i++ {
+		candidate := fmt.Sprintf("%s (%d)%s", base, i, ext)
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate
+		}
+	}
+}
+
 // ScanChannels starts background scanning of channels for audio messages.
+// Only one scan may run at a time; repeated calls while scanning fail.
 func (m *Manager) ScanChannels(ctx context.Context, channels []string, downloadDir string) error {
+	m.mu.Lock()
+	if m.scanCancel != nil {
+		m.mu.Unlock()
+		return fmt.Errorf("扫描正在进行中，请稍候")
+	}
+	taskCtx, cancel := context.WithCancel(ctx)
+	m.scanCancel = cancel
+	m.mu.Unlock()
+
 	go func() {
-		readyCtx, readyCancel := context.WithTimeout(context.Background(), readyTimeout)
+		defer func() {
+			m.mu.Lock()
+			m.scanCancel = nil
+			m.mu.Unlock()
+		}()
+
+		readyCtx, readyCancel := context.WithTimeout(taskCtx, readyTimeout)
 		defer readyCancel()
 		if err := m.client.WaitReady(readyCtx); err != nil {
 			m.state.AddLog(fmt.Sprintf("等待连接就绪失败: %v", err))
 			return
 		}
-		scanCtx, scanCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		scanCtx, scanCancel := context.WithTimeout(taskCtx, 10*time.Minute)
 		defer scanCancel()
 		for _, ch := range channels {
+			select {
+			case <-scanCtx.Done():
+				return
+			default:
+			}
+
 			m.state.AddLog(fmt.Sprintf("扫描频道: %s", ch))
 			msgs, err := m.scanChannel(scanCtx, ch, downloadDir)
 			if err != nil {
@@ -315,8 +388,7 @@ func (m *Manager) ScanChannels(ctx context.Context, channels []string, downloadD
 			}
 
 			existing, _ := m.state.GetMessages()
-			existing = append(existing, msgs...)
-			m.state.SetMessages(existing)
+			m.state.SetMessages(dedupeMessages(append(existing, msgs...)))
 		}
 		msgs, scannedAt := m.state.GetMessages()
 		m.hub.Broadcast("scan_result", map[string]interface{}{
@@ -387,7 +459,7 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 			return
 		}
 
-		dlCtx, dlCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		dlCtx, dlCancel := context.WithTimeout(ctx, 10*time.Minute)
 		defer dlCancel()
 
 		_, peer, err := m.resolveChannel(dlCtx, channel)
@@ -435,7 +507,7 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 				m.state.AddLog(fmt.Sprintf("创建目录失败: %v", err))
 				return
 			}
-			savePath := filepath.Join(dirPath, saveName)
+			savePath := uniquePath(filepath.Join(dirPath, saveName))
 			if err := m.downloadDocument(dlCtx, doc, savePath); err != nil {
 				if errors.Is(err, syscall.ENOSPC) {
 					m.state.AddLog("磁盘空间不足，下载失败，请清理磁盘空间后重试")
@@ -443,7 +515,7 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 				}
 				m.state.AddLog(fmt.Sprintf("下载错误: %v", err))
 			} else {
-				m.afterDownloadSuccess(channel, msgMsg.ID, saveName)
+				m.afterDownloadSuccess(channel, msgMsg.ID, filepath.Base(savePath))
 				m.state.AddLog("快速测试完成，请检查下载目录")
 			}
 			return
@@ -517,7 +589,7 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 				continue
 			}
 			saveName := sanitizeFilename(docFileName(doc))
-			savePath := filepath.Join(dirPath, saveName)
+			savePath := uniquePath(filepath.Join(dirPath, saveName))
 			if m.record.Exists(channel, msgMsg.ID) {
 				m.state.AddLog(fmt.Sprintf("文件已下载，跳过: %s", saveName))
 				continue
@@ -535,7 +607,7 @@ func (m *Manager) downloadChannel(ctx context.Context, channel, downloadDir stri
 				continue
 			}
 			m.state.AddLog("下载完成")
-			m.afterDownloadSuccess(channel, msgMsg.ID, saveName)
+			m.afterDownloadSuccess(channel, msgMsg.ID, filepath.Base(savePath))
 			count++
 		}
 
@@ -646,7 +718,7 @@ func (m *Manager) downloadMessage(ctx context.Context, channel, dir string, msgI
 		return true, nil
 	}
 
-	return true, m.downloadDocument(ctx, doc, savePath)
+	return true, m.downloadDocument(ctx, doc, uniquePath(savePath))
 }
 
 const maxDownloadRetries = 3

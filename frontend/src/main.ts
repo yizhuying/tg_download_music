@@ -13,6 +13,7 @@ const router = createRouter({
   routes: [
     { path: '/', component: ConfigView },
     { path: '/download', component: DownloadView },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 

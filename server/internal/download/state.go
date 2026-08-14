@@ -72,35 +72,50 @@ func (ds *DownloadState) SetRunning(running bool, channel string) {
 		ds.state.Logs = make([]LogEntry, 0, 100)
 	}
 	st := ds.snapshotLocked()
+	bc := ds.broadcaster
 	ds.mu.Unlock()
 
-	if ds.broadcaster != nil {
-		ds.broadcaster("download_status", st)
+	if bc != nil {
+		bc("download_status", st)
 	}
 }
 
+// slimStatus is the incremental download progress broadcast. It omits the
+// log history so per-file updates stay small during batch downloads.
+type slimStatus struct {
+	Running         bool   `json:"running"`
+	TotalDownloaded int    `json:"total_downloaded"`
+	CurrentChannel  string `json:"current_channel"`
+}
+
 // IncrementDownloaded atomically increases the total download counter
-// and broadcasts the updated state via WebSocket.
+// and broadcasts a slim progress update via WebSocket.
 func (ds *DownloadState) IncrementDownloaded() {
 	ds.mu.Lock()
 	ds.state.TotalDownloaded++
-	st := ds.snapshotLocked()
+	st := slimStatus{
+		Running:         ds.state.Running,
+		TotalDownloaded: ds.state.TotalDownloaded,
+		CurrentChannel:  ds.state.CurrentChannel,
+	}
+	bc := ds.broadcaster
 	ds.mu.Unlock()
 
-	if ds.broadcaster != nil {
-		ds.broadcaster("download_status", st)
+	if bc != nil {
+		bc("download_status", st)
 	}
 }
 
 // SetBroadcaster sets an optional callback for broadcasting log entries.
 func (ds *DownloadState) SetBroadcaster(fn func(typ string, data interface{})) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
 	ds.broadcaster = fn
 }
 
 // AddLog appends a timestamped log entry and returns it.
 func (ds *DownloadState) AddLog(msg string) LogEntry {
 	ds.mu.Lock()
-	defer ds.mu.Unlock()
 	entry := LogEntry{
 		Time:    time.Now().Format("15:04:05"),
 		Message: msg,
@@ -109,8 +124,11 @@ func (ds *DownloadState) AddLog(msg string) LogEntry {
 	if len(ds.state.Logs) > 500 {
 		ds.state.Logs = ds.state.Logs[len(ds.state.Logs)-500:]
 	}
-	if ds.broadcaster != nil {
-		ds.broadcaster("log", map[string]string{
+	bc := ds.broadcaster
+	ds.mu.Unlock()
+
+	if bc != nil {
+		bc("log", map[string]string{
 			"time":    entry.Time,
 			"message": entry.Message,
 		})
@@ -136,7 +154,8 @@ func (ds *DownloadState) GetMessages() ([]ScannedMessage, string) {
 }
 
 // MarkDownloaded sets Exists=true for a specific channel+message combination
-// and broadcasts the updated messages via WebSocket.
+// and broadcasts a per-file update so clients can patch a single list entry
+// instead of resending the whole scanned list.
 func (ds *DownloadState) MarkDownloaded(channel string, msgID int) {
 	ds.mu.Lock()
 	for i := range ds.messages {
@@ -145,15 +164,13 @@ func (ds *DownloadState) MarkDownloaded(channel string, msgID int) {
 			break
 		}
 	}
-	msgs := make([]ScannedMessage, len(ds.messages))
-	copy(msgs, ds.messages)
-	sa := ds.scannedAt
+	bc := ds.broadcaster
 	ds.mu.Unlock()
 
-	if ds.broadcaster != nil {
-		ds.broadcaster("scan_result", map[string]interface{}{
-			"messages":   msgs,
-			"scanned_at": sa,
+	if bc != nil {
+		bc("file_downloaded", map[string]interface{}{
+			"channel": channel,
+			"msg_id":  msgID,
 		})
 	}
 }

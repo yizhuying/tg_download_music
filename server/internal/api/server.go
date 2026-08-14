@@ -115,7 +115,6 @@ func (s *Server) registerRoutes() {
 	s.router.GET("/api/ws", s.hub.HandleWS)
 
 	api := s.router.Group("/api")
-	api.Use(authMiddleware())
 
 	api.GET("/system/info", s.getSystemInfo)
 
@@ -123,10 +122,11 @@ func (s *Server) registerRoutes() {
 	api.POST("/config", s.saveConfig)
 	api.POST("/config/proxy/test", s.testProxy)
 
-	api.GET("/auth/status", s.getAuthStatus)
-	api.POST("/auth/send_code", s.initTelegramClient(), s.sendCode)
-	api.POST("/auth/sign_in", s.requireTelegramClient(), s.signIn)
-	api.POST("/auth/logout", s.logout)
+	tgAuth := api.Group("/tg")
+	tgAuth.GET("/auth/status", s.getAuthStatus)
+	tgAuth.POST("/auth/send_code", s.initTelegramClient(), s.sendCode)
+	tgAuth.POST("/auth/sign_in", s.requireTelegramClient(), s.signIn)
+	tgAuth.POST("/auth/logout", s.logout)
 
 	task := api.Group("/task")
 	task.GET("/status", s.getDownloadStatus)

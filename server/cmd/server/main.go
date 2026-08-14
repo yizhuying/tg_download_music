@@ -28,12 +28,7 @@ func main() {
 	downloadDir := flag.String("download-dir", "", "override download directory")
 	sessionDir := flag.String("session-dir", "", "override session directory")
 	socketPath := flag.String("socket", "", "unix socket path for gateway mode")
-	adminPassword := flag.String("admin-password", "", "set admin password")
 	flag.Parse()
-
-	if *adminPassword != "" {
-		_ = os.Setenv("ADMIN_PASSWORD", *adminPassword)
-	}
 
 	listenAddr := fmt.Sprintf(":%d", *port)
 	cfg, err := config.NewManager(*configPath)

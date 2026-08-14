@@ -41,19 +41,6 @@
             "message": "端口号必须是数字"
           }
         ]
-      },
-      {
-        "type": "password",
-        "field": "wizard_app_password",
-        "label": "管理密码",
-        "initValue": "admin",
-        "rules": [
-          {
-            "required": true,
-            "message": "请输入管理密码"
-          }
-        ],
-        "helpText": "默认密码为 admin，如需修改，请直接输入新密码。"
       }
     ]
   }

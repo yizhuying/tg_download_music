@@ -2,7 +2,7 @@
 import {ref, onMounted} from 'vue'
 import {
   getConfig, saveConfig, getAuthStatus, sendCode, signIn, logout,
-  setAdminPassword, getAdminPassword, clearAdminPassword, startDownload, getDownloadDirList, testProxy,
+  startDownload, getDownloadDirList, testProxy,
   type Config, type AuthStatus,
 } from '../api/http'
 import {useRouter} from 'vue-router'
@@ -11,12 +11,6 @@ import {useMessage, useDialog, NInput, NButton, NInputNumber, NSelect, NTag, NTi
 const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
-
-const savedPwd = getAdminPassword() || sessionStorage.getItem('tg_admin_pwd') || ''
-if (savedPwd) setAdminPassword(savedPwd)
-const password = ref(savedPwd)
-const showLogin = ref(!savedPwd)
-const loginError = ref('')
 
 const apiId = ref<number | undefined>()
 const apiHash = ref('')
@@ -87,24 +81,6 @@ function showError(msg: string) {
   message.error(msg, {duration: 3000})
 }
 
-async function doLogin() {
-  if (!password.value) {
-    loginError.value = '请输入密码'
-    return
-  }
-  setAdminPassword(password.value)
-  try {
-    const data = await getConfig()
-    fillConfig(data)
-    showLogin.value = false
-    sessionStorage.setItem('tg_admin_pwd', password.value)
-    await loadAuthStatus()
-    await loadDirOptions()
-  } catch {
-    loginError.value = '密码错误'
-  }
-}
-
 function fillConfig(data: Config) {
   apiId.value = data.api_id || undefined
   apiHash.value = data.api_hash || ''
@@ -136,7 +112,7 @@ async function doSendCode() {
     showToast('请输入手机号')
     return
   }
-  await doSaveConfig()
+  if (!(await doSaveConfig())) return
   try {
     await sendCode(authPhone.value)
     showCodeSection.value = true
@@ -185,6 +161,8 @@ function doLogout() {
         authLoggedIn.value = false
         showCodeSection.value = false
         show2FA.value = false
+        authCode.value = ''
+        auth2FA.value = ''
       } catch {
         // error shown by interceptor
       }
@@ -192,14 +170,14 @@ function doLogout() {
   })
 }
 
-async function doSaveConfig() {
+async function doSaveConfig(): Promise<boolean> {
   if (!apiId.value || !apiHash.value) {
     showError('API ID 和 API Hash 为必填项')
-    return
+    return false
   }
   if (proxyScheme.value !== 'none' && (!proxyHostname.value || !proxyPort.value)) {
     showError('代理主机和端口为必填项')
-    return
+    return false
   }
   const data = {
     api_id: apiId.value,
@@ -220,8 +198,10 @@ async function doSaveConfig() {
   try {
     const res = await saveConfig(data)
     showToast(res.message || '配置已保存')
+    return true
   } catch {
     // error shown by interceptor
+    return false
   }
 }
 
@@ -266,30 +246,13 @@ function removeChannel(i: number) {
 }
 
 onMounted(() => {
-  if (getAdminPassword()) {
-    getConfig().then(fillConfig).then(loadAuthStatus).then(loadDirOptions).catch(() => {
-      showLogin.value = true
-    })
-  }
+  getConfig().then(fillConfig).then(loadAuthStatus).then(loadDirOptions).catch(() => {})
 })
 </script>
 
 <template>
   <div>
-    <div v-if="showLogin" class="login-overlay">
-      <div class="login-card">
-        <h2>管理登录</h2>
-        <div class="form-group">
-          <label>密码</label>
-          <n-input v-model:value="password" type="password" show-password-on="click"
-                   placeholder="输入管理密码" @keydown.enter="doLogin" />
-        </div>
-        <div class="login-error">{{ loginError }}</div>
-        <n-button type="primary" style="width:50%" @click="doLogin">登录</n-button>
-      </div>
-    </div>
-
-    <div v-if="!showLogin">
+    <div>
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <h2>API 凭证</h2>

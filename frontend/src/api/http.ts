@@ -3,19 +3,6 @@ import {http, unwrap, type ApiResponse, type Config, type AuthStatus, type Downl
 export type {Config, AuthStatus, DownloadStatus, DownloadList}
 export type {ScannedFile} from './response'
 
-export function setAdminPassword(pwd: string) {
-    http.defaults.headers.common['X-Admin-Password'] = pwd
-}
-
-export function getAdminPassword(): string {
-    const pwd = http.defaults.headers.common['X-Admin-Password']
-    return typeof pwd === 'string' ? pwd : ''
-}
-
-export function clearAdminPassword() {
-    delete http.defaults.headers.common['X-Admin-Password']
-}
-
 export async function getConfig(): Promise<Config> {
     const res = await http.get<any, ApiResponse<Config>>('/config')
     return unwrap(res)
@@ -26,20 +13,20 @@ export async function saveConfig(data: Partial<Config>): Promise<ApiResponse> {
 }
 
 export async function getAuthStatus(): Promise<AuthStatus> {
-    const res = await http.get<any, ApiResponse<AuthStatus>>('/auth/status')
+    const res = await http.get<any, ApiResponse<AuthStatus>>('/tg/auth/status')
     return unwrap(res)
 }
 
 export async function sendCode(phoneNumber: string): Promise<ApiResponse> {
-    return http.post('/auth/send_code', {phone_number: phoneNumber})
+    return http.post('/tg/auth/send_code', {phone_number: phoneNumber})
 }
 
 export async function signIn(phoneCode: string, password?: string): Promise<ApiResponse<{ need_2fa?: boolean }>> {
-    return http.post('/auth/sign_in', {phone_code: phoneCode, password})
+    return http.post('/tg/auth/sign_in', {phone_code: phoneCode, password})
 }
 
 export async function logout(): Promise<ApiResponse> {
-    return http.post('/auth/logout')
+    return http.post('/tg/auth/logout')
 }
 
 export async function getDownloadStatus(): Promise<DownloadStatus> {

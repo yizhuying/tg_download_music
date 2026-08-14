@@ -94,7 +94,7 @@ func (s *Server) signIn(c *gin.Context) {
 	var result *telegram.SignInResult
 	var signinErr error
 	if req.Password != "" {
-		result, signinErr = s.tgClient.SignInWithPassword(context.Background(), state.PhoneNumber, req.PhoneCode, state.PhoneCodeHash, req.Password)
+		result, signinErr = s.tgClient.SignInWithPassword(context.Background(), req.Password)
 	} else {
 		result, signinErr = s.tgClient.SignIn(context.Background(), state.PhoneNumber, req.PhoneCode, state.PhoneCodeHash)
 	}
@@ -127,6 +127,9 @@ func (s *Server) logout(c *gin.Context) {
 	if s.cancelRunning != nil {
 		s.cancelRunning()
 		s.cancelRunning = nil
+	}
+	if s.downloadManager != nil {
+		s.downloadManager.Close()
 	}
 	s.tgClient = nil
 	s.downloadManager = nil
