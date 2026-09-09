@@ -12,6 +12,7 @@ import (
 	"github.com/yizhuying/tg-music/internal/config"
 	"github.com/yizhuying/tg-music/internal/download"
 	"github.com/yizhuying/tg-music/internal/telegram"
+	"github.com/yizhuying/tg-music/internal/trimapp"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -28,6 +29,7 @@ type Server struct {
 	authState       AuthState
 	authStateMu     sync.RWMutex
 	tgClient        *telegram.Client
+	trimClient      *trimapp.Client
 	runningCtx      context.Context
 	cancelRunning   context.CancelFunc
 	logger          *zap.Logger
@@ -35,13 +37,19 @@ type Server struct {
 	buildTime       string
 }
 
+// trimAppName must match appname in the fnOS package manifest; the open API
+// gateway rejects requests for other app names.
+const trimAppName = "TuneGram"
+
 // NewServer creates a new Server with all subcomponents initialized.
-func NewServer(cfg *config.Manager, webFS fs.FS, version, buildTime string) *Server {
+func NewServer(cfg *config.Manager, webFS fs.FS, version, buildTime string, logger *zap.Logger) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	logger := zap.NewNop()
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	dlState := download.NewDownloadState()
 
 	s := &Server{
@@ -49,6 +57,7 @@ func NewServer(cfg *config.Manager, webFS fs.FS, version, buildTime string) *Ser
 		config:        cfg,
 		webFS:         webFS,
 		downloadState: dlState,
+		trimClient:    trimapp.New(trimAppName),
 		logger:        logger,
 		version:       version,
 		buildTime:     buildTime,
@@ -92,6 +101,8 @@ func (s *Server) ensureTelegramClient() error {
 
 	s.tgClient = client
 	dlState := s.downloadState
+	// Per-file download logs stay in the UI log panel only; mirroring them to
+	// the log file made it grow too fast during batch downloads.
 	dlState.SetBroadcaster(func(typ string, data interface{}) {
 		s.hub.Broadcast(typ, data)
 	})

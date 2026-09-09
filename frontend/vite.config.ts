@@ -19,9 +19,15 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'naive-ui': ['naive-ui'],
-          'vue-vendor': ['vue', 'vue-router'],
+        // naive-ui is deliberately NOT pinned to any chunk: with lazy routes
+        // Rollup splits its components across per-view chunks, keeping every
+        // output file small instead of one ~500 kB naive-ui bundle.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('/vue/') || id.includes('@vue/') || id.includes('vue-router')) return 'vue-vendor'
+          if (id.includes('date-fns')) return 'date-fns'
+          if (id.includes('@vicons')) return 'vicons'
+          return undefined
         },
       },
     },

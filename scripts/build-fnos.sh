@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG_DIR="${ROOT}/fnnas.tg-music"
-APP_SERVER_DIR="${PKG_DIR}/app/server"
 package_name="TuneGram"
 
 # Locate fnpack
@@ -33,14 +32,27 @@ cd "${ROOT}/server"
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o "${ROOT}/tg-music-server" ./cmd/server/
 
 # [3] Build fnOS package
-echo "[3/3] Copying binary to package and building .fpk..."
-mkdir -p "${APP_SERVER_DIR}"
-cp "${ROOT}/tg-music-server" "${APP_SERVER_DIR}/"
-cd "${PKG_DIR}"
-${FNPACK} build
-mv -f "${PKG_DIR}/${package_name}.fpk" "${ROOT}/${package_name}.fpk"
+# Package version: git tag when HEAD is tagged, otherwise 0.1.<commit count>
+if TAG=$(cd "${ROOT}" && git describe --tags --exact-match 2>/dev/null); then
+    APP_VERSION="${TAG#v}"
+else
+    APP_VERSION="0.1.$(cd "${ROOT}" && git rev-list --count HEAD)"
+fi
+echo "[3/3] Building .fpk (version ${APP_VERSION})..."
+
+# Stage a copy so version injection and the binary never modify the source package
+STAGE_DIR=$(mktemp -d)
+trap 'rm -rf "${STAGE_DIR}"' EXIT
+cp -R "${PKG_DIR}/." "${STAGE_DIR}/"
+mkdir -p "${STAGE_DIR}/app/server"
+cp "${ROOT}/tg-music-server" "${STAGE_DIR}/app/server/"
+sed "s/^version[[:space:]]*=.*/version               = ${APP_VERSION}/" \
+    "${PKG_DIR}/manifest" > "${STAGE_DIR}/manifest"
+cd "${STAGE_DIR}"
+"${FNPACK}" build
+mv -f "${STAGE_DIR}/${package_name}.fpk" "${ROOT}/${package_name}.fpk"
 
 echo ""
 echo "=== Build complete ==="
-echo "Package: ${ROOT}/${package_name}.fpk"
+echo "Package: ${ROOT}/${package_name}.fpk (version ${APP_VERSION})"
 ls -lh "${ROOT}/${package_name}.fpk"

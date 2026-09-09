@@ -5,8 +5,10 @@ import {
   getDownloadList, downloadSingle, quickTest,
   type DownloadStatus, type DownloadList,
 } from '../api/http'
-import {NInput, NButton, NCheckbox} from 'naive-ui'
+import {useMessage, NInput, NButton, NCheckbox} from 'naive-ui'
 import {onMessage, wsStatus, wsRetryCount, latestDownloadStatus} from '../api/ws'
+
+const message = useMessage()
 
 const running = ref(false)
 const totalDownloaded = ref(0)
@@ -49,6 +51,8 @@ function handleWSMessage(msg: { type: string; payload: { time?: string; message?
       const item = messages.value.find(m => m.channel === msg.payload.channel && m.msg_id === msg.payload.msg_id)
       if (item) item.exists = true
     }
+  } else if (msg.type === 'download_complete') {
+    if (msg.payload.message) message.success(msg.payload.message, {duration: 3000})
   } else if (msg.type === 'scan_result') {
     messages.value = msg.payload.messages || []
     scannedAt.value = msg.payload.scanned_at || '-'
@@ -69,7 +73,8 @@ function initPage(data: DownloadStatus) {
 
 async function doQuickTest() {
   try {
-    await quickTest()
+    const res = await quickTest()
+    if (res.message) message.success(res.message, {duration: 2000})
     const data = await getDownloadStatus()
     running.value = data.running
   } catch {
@@ -79,7 +84,8 @@ async function doQuickTest() {
 
 async function doScan() {
   try {
-    await scanChannels()
+    const res = await scanChannels()
+    if (res.message) message.success(res.message, {duration: 2000})
   } catch {
     // error shown by interceptor
   }
@@ -93,7 +99,8 @@ async function doStop() {
 
 async function doStartAll() {
   try {
-    await startDownload()
+    const res = await startDownload()
+    if (res.message) message.success(res.message, {duration: 2000})
     const data = await getDownloadStatus()
     running.value = data.running
   } catch {

@@ -306,7 +306,7 @@ func (m *Manager) Start(ctx context.Context) error {
 			m.state.AddLog(fmt.Sprintf("频道 %s 下载完毕，共下载 %d 个文件", next, count))
 		}
 
-		m.state.AddLog(fmt.Sprintf("全部完成，共下载 %d 个文件", m.state.Get().TotalDownloaded))
+		m.state.Complete(fmt.Sprintf("全部完成，共下载 %d 个文件", m.state.Get().TotalDownloaded))
 	}()
 
 	return nil
@@ -454,7 +454,7 @@ func (m *Manager) DownloadSingle(ctx context.Context, channel, dir string, msgID
 			return
 		}
 		m.afterDownloadSuccess(channel, msgID, "")
-		m.state.AddLog("下载完成")
+		m.state.Complete("下载完成")
 	}()
 
 	return nil
@@ -544,7 +544,7 @@ func (m *Manager) QuickTest(ctx context.Context, channel, dir string) error {
 				m.state.AddLog(fmt.Sprintf("下载错误: %v", err))
 			} else {
 				m.afterDownloadSuccess(channel, msgMsg.ID, filepath.Base(savePath))
-				m.state.AddLog("快速测试完成，请检查下载目录")
+				m.state.Complete("快速测试完成，请检查下载目录")
 			}
 			return
 		}

@@ -44,6 +44,30 @@ func TestMarkDownloadedBroadcastsPerFile(t *testing.T) {
 	}
 }
 
+func TestCompleteBroadcastsLogAndCompletion(t *testing.T) {
+	ds := NewDownloadState()
+
+	var mu sync.Mutex
+	var got []captured
+	ds.SetBroadcaster(func(typ string, data interface{}) {
+		raw, _ := json.Marshal(data)
+		mu.Lock()
+		got = append(got, captured{typ: typ, raw: string(raw)})
+		mu.Unlock()
+	})
+
+	ds.Complete("全部完成，共下载 3 个文件")
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 2 || got[0].typ != "log" || got[1].typ != "download_complete" {
+		t.Fatalf("expected log + download_complete broadcasts, got %+v", got)
+	}
+	if got[1].raw != `{"message":"全部完成，共下载 3 个文件"}` {
+		t.Fatalf("unexpected completion payload: %s", got[1].raw)
+	}
+}
+
 func TestIncrementDownloadedBroadcastsSlimStatus(t *testing.T) {
 	ds := NewDownloadState()
 	for i := 0; i < 500; i++ {

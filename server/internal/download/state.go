@@ -136,6 +136,18 @@ func (ds *DownloadState) AddLog(msg string) LogEntry {
 	return entry
 }
 
+// Complete logs a task-level completion message and additionally broadcasts
+// a download_complete event so the UI can surface a toast, not just a log line.
+func (ds *DownloadState) Complete(msg string) {
+	ds.AddLog(msg)
+	ds.mu.RLock()
+	bc := ds.broadcaster
+	ds.mu.RUnlock()
+	if bc != nil {
+		bc("download_complete", map[string]string{"message": msg})
+	}
+}
+
 // SetMessages replaces the scanned messages list.
 func (ds *DownloadState) SetMessages(msgs []ScannedMessage) {
 	ds.mu.Lock()
